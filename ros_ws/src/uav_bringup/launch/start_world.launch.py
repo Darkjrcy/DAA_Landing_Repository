@@ -62,7 +62,7 @@ def launch_setup(context, *args, **kargs):
 
 def generate_launch_description():
     plane_bringup_dir = get_package_share_directory('uav_bringup')
-    default_world_path = os.path.join(plane_bringup_dir, 'worlds', 'empty_world.sdf')
+    default_world_path = os.path.join(plane_bringup_dir, 'worlds', 'ERAU.sdf')
 
     return LaunchDescription([
         DeclareLaunchArgument(

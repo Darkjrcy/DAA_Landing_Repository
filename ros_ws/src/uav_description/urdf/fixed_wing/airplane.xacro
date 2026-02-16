@@ -2,9 +2,9 @@
 <robot name="airplane" xmlns:xacro="http://ros.org/wiki/xacro">
 
     <!-- Add the Gazebo xacro file-->
-    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/airplane_gazebo.xacro"/>
+    <xacro:include filename="$(find uav_description)/urdf/fixed_wing/airplane_gazebo.xacro"/>
     <!-- Add the for spawner file-->
-    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/add_fog.xacro"/>
+    <xacro:include filename="$(find uav_description)/urdf/fixed_wing/add_fog.xacro"/>
 
     <xacro:macro name="airplane" params="robot_scale robot_name camera_num world_name initial_alt fog_lifetime fog_rate enable_fog">
         <!-- LINK SECTIONS OF THE AIRPLANE-->
@@ -22,13 +22,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/body.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/body.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/body.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/body.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -44,13 +44,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_aileron.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/left_aileron.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_aileron.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/left_aileron.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -66,13 +66,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_flap.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/left_flap.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_flap.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/left_flap.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -88,13 +88,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_aileron.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/right_aileron.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_aileron.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/right_aileron.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -110,13 +110,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_flap.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/right_flap.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_flap.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/right_flap.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -132,13 +132,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/elevators.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/elevators.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/elevators.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/elevators.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -154,13 +154,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/rudder.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/rudder.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/rudder.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/rudder.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>
@@ -176,13 +176,13 @@
             </inertial>
             <collision name="collision">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/cessna_prop.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/cessna_prop.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                <mesh filename="file://$(find plane_description)/meshes/Cessna/cessna_prop.dae"
+                <mesh filename="file://$(find uav_description)/meshes/Cessna/cessna_prop.dae"
                         scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
                 </geometry>
             </visual>

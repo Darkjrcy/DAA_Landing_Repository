@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="main_airplane">
-    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/airplane.xacro"/>
+    <xacro:include filename="$(find uav_description)/urdf/fixed_wing/airplane.xacro"/>
     <xacro:arg name="robot_name" default="airplane_1"/>
     <xacro:arg name="robot_scale" default="1.0"/>
     <xacro:arg name="camera_num" default="1.0"/>
