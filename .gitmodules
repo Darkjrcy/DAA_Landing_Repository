@@ -1,0 +1,3 @@
+[submodule "ros_ws/src/libpredict"]
+	path = ros_ws/src/libpredict
+	url = git@github.com:Darkjrcy/libpredict.git
