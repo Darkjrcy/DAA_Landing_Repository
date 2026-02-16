@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <asset>
+    <contributor>
+      <author>Blender User</author>
+      <authoring_tool>Blender 4.4.3 commit date:2025-04-29, commit time:14:09, hash:802179c51ccc</authoring_tool>
+    </contributor>
+    <created>2025-07-07T18:17:30</created>
+    <modified>2025-07-07T18:17:30</modified>
+    <unit name="meter" meter="1"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+  <library_effects>
+    <effect id="Material_001-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <emission>
+              <color sid="emission">0 0 0 1</color>
+            </emission>
+            <diffuse>
+              <color sid="diffuse">0.6514015 0.6514063 0.651406 1</color>
+            </diffuse>
+            <index_of_refraction>
+              <float sid="ior">1.5</float>
+            </index_of_refraction>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+  <library_images/>
+  <library_materials>
+    <material id="Material_001-material" name="Material.001">
+      <instance_effect url="#Material_001-effect"/>
+    </material>
+  </library_materials>
+  <library_geometries>
+    <geometry id="right_flap-mesh" name="right_flap">
+      <mesh>
+        <source id="right_flap-mesh-positions">
+          <float_array id="right_flap-mesh-positions-array" count="39">-77.56742 -22.04078 51.54837 -77.54273 -52.19577 52.55353 -62.41268 -22.06723 57.50204 -62.46531 -52.22209 58.73916 -62.46531 -52.22209 54.48655 -77.59442 -81.8094 53.79065 -62.51686 -81.75839 55.72367 -62.49109 -66.99025 55.10511 -62.41268 -22.06723 54.48655 -62.51686 -81.75839 59.2804 -62.5506 -101.0884 56.26491 -76.93228 -101.1407 54.40923 -62.5506 -101.0884 60.0536</float_array>
+          <technique_common>
+            <accessor source="#right_flap-mesh-positions-array" count="13" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="right_flap-mesh-normals">
+          <float_array id="right_flap-mesh-normals-array" count="39">-0.3654345 0.03071165 0.9303303 -0.379217 0.03859013 0.9245027 0.1270399 -0.0329408 -0.9913504 -0.3792057 0.03928232 0.9244782 0.1271927 -0.04162162 -0.9910044 0.1269831 -0.04173058 -0.9910267 0.1269831 -0.04173052 -0.9910267 0.190334 -3.32203e-4 -0.9817194 -0.3421272 0.01781278 0.9394848 0.1272077 -0.02798342 -0.9914813 -0.3421255 0.0183435 0.9394752 0.1280199 -0.02733856 -0.9913948 -0.3651971 0.03784376 0.9301607</float_array>
+          <technique_common>
+            <accessor source="#right_flap-mesh-normals-array" count="13" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="right_flap-mesh-vertices">
+          <input semantic="POSITION" source="#right_flap-mesh-positions"/>
+        </vertices>
+        <triangles material="Material_001-material" count="13">
+          <input semantic="VERTEX" source="#right_flap-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#right_flap-mesh-normals" offset="1"/>
+          <p>0 0 1 0 2 0 2 1 1 1 3 1 0 2 4 2 1 2 1 3 5 3 3 3 1 4 6 4 5 4 6 5 1 5 7 5 7 6 1 6 4 6 0 7 8 7 4 7 3 8 5 8 9 8 6 9 10 9 5 9 9 10 5 10 11 10 5 11 10 11 11 11 9 12 11 12 12 12</p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  <library_visual_scenes>
+    <visual_scene id="Scene" name="Scene">
+      <node id="right_flap" name="right_flap" type="NODE">
+        <matrix sid="transform">0.02549998 0 0 0 0 0.02549998 0 0 0 0 0.02549998 0 0 0 0 1</matrix>
+        <instance_geometry url="#right_flap-mesh" name="right_flap">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="Material_001-material" target="#Material_001-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+  <scene>
+    <instance_visual_scene url="#Scene"/>
+  </scene>
+</COLLADA>

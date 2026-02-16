@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="main_airplane">
+    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/airplane.xacro"/>
+    <xacro:arg name="robot_name" default="airplane_1"/>
+    <xacro:arg name="robot_scale" default="1.0"/>
+    <xacro:arg name="camera_num" default="1.0"/>
+
+    <!-- Characteristics required by the GNSS plugin: -->
+    <xacro:arg name= "world_name" default="empty_world" />
+    <xacro:arg name= "initial_alt" default="50.0" />
+
+    <!-- Define the Fog characteristics-->
+    <xacro:arg name= "fog_lifetime" default = "1"/>
+    <xacro:arg name= "fog_rate" default = "5"/>
+    <xacro:arg name= "enable_fog" default="false"/>
+
+
+    <xacro:airplane  
+        robot_name="$(arg robot_name)" 
+        robot_scale="$(arg robot_scale)" 
+        camera_num="$(arg camera_num)" 
+        world_name="$(arg world_name)" 
+        initial_alt="$(arg initial_alt)"
+        fog_lifetime="$(arg fog_lifetime)"
+        fog_rate="$(arg fog_rate)"
+        enable_fog="$(arg enable_fog)"/>
+</robot>

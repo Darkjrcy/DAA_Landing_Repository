@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <asset>
+    <contributor>
+      <author>Blender User</author>
+      <authoring_tool>Blender 4.4.3 commit date:2025-04-29, commit time:14:09, hash:802179c51ccc</authoring_tool>
+    </contributor>
+    <created>2025-07-07T18:23:43</created>
+    <modified>2025-07-07T18:23:43</modified>
+    <unit name="meter" meter="1"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+  <library_effects>
+    <effect id="Material_001-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <emission>
+              <color sid="emission">0 0 0 1</color>
+            </emission>
+            <diffuse>
+              <color sid="diffuse">0.6514015 0.6514063 0.651406 1</color>
+            </diffuse>
+            <index_of_refraction>
+              <float sid="ior">1.5</float>
+            </index_of_refraction>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+  <library_images/>
+  <library_materials>
+    <material id="Material_001-material" name="Material.001">
+      <instance_effect url="#Material_001-effect"/>
+    </material>
+  </library_materials>
+  <library_geometries>
+    <geometry id="left_aileron-mesh" name="left_aileron">
+      <mesh>
+        <source id="left_aileron-mesh-positions">
+          <float_array id="left_aileron-mesh-positions-array" count="45">-1.890629 3.162291 1.417009 -1.608685 3.159825 1.450527 -1.658063 2.591684 1.423873 -1.952748 2.590616 1.387434 -1.836647 3.590048 1.438697 -1.610656 3.159829 1.521507 -1.552725 3.591525 1.553054 -1.552725 3.591525 1.472216 -1.662914 2.59011 1.496511 -1.494772 4.035046 1.56094 -1.774745 4.037508 1.464329 -1.494772 4.035046 1.497847 -1.400707 4.835382 1.588544 -1.664906 4.837811 1.505734 -1.400707 4.835382 1.527422</float_array>
+          <technique_common>
+            <accessor source="#left_aileron-mesh-positions-array" count="15" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="left_aileron-mesh-normals">
+          <float_array id="left_aileron-mesh-normals-array" count="48">0.1182861 0.03627389 -0.9923169 0.1224944 0.03799605 -0.9917416 0.1182822 0.03538733 -0.9923492 -0.3497422 -0.01045984 0.9367876 -0.3736076 1.17468e-4 0.9275869 0.1169915 0.0346986 -0.9925265 -0.3522257 -0.008752107 0.9358741 -0.3497657 -0.02150511 0.9365903 -0.3735565 0.0323261 0.9270439 0.1169345 0.04066497 -0.9923067 -0.3262565 -0.009010791 0.9452384 0.1191288 0.0417627 -0.9920001 -0.3261486 0.005729913 0.9453012 0.119101 0.03499007 -0.9922654 -0.2991487 -0.008308172 0.9541703 0.08203315 0.02717328 -0.9962592</float_array>
+          <technique_common>
+            <accessor source="#left_aileron-mesh-normals-array" count="16" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="left_aileron-mesh-vertices">
+          <input semantic="POSITION" source="#left_aileron-mesh-positions"/>
+        </vertices>
+        <triangles material="Material_001-material" count="16">
+          <input semantic="VERTEX" source="#left_aileron-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#left_aileron-mesh-normals" offset="1"/>
+          <p>0 0 1 0 2 0 0 1 2 1 3 1 4 2 1 2 0 2 0 3 3 3 5 3 6 4 4 4 0 4 7 5 1 5 4 5 5 6 3 6 8 6 6 7 0 7 5 7 9 8 4 8 6 8 10 9 7 9 4 9 10 10 4 10 9 10 10 11 11 11 7 11 12 12 10 12 9 12 13 13 11 13 10 13 13 14 10 14 12 14 13 15 14 15 11 15</p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  <library_visual_scenes>
+    <visual_scene id="Scene" name="Scene">
+      <node id="left_aileron" name="left_aileron" type="NODE">
+        <matrix sid="transform">1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <instance_geometry url="#left_aileron-mesh" name="left_aileron">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="Material_001-material" target="#Material_001-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+  <scene>
+    <instance_visual_scene url="#Scene"/>
+  </scene>
+</COLLADA>

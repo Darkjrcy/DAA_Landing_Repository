@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<robot name="add_fog" xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:macro name="add_fog" params="robot_scale fog_lifetime fog_rate">
+        <!-- This is the fog link where the particle generator is applied-->
+        <link name="fog_link">
+            <visual>
+                <geometry>
+                  <box size="${0.05 * robot_scale} ${0.05 * robot_scale} ${0.05 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <collision>
+                <geometry>
+                  <box size="${0.05 * robot_scale} ${0.05 * robot_scale} ${0.05 * robot_scale}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="${0.1 * robot_scale}"/>
+                <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+
+
+        <!-- Define a joint with the airplane so the fog moves witht eh airplane -->
+        <joint name="fog_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="fog_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/> 
+        </joint>
+
+
+        <!-- Add the particle generator plugin-->
+        <gazebo reference="fog_link">
+      <particle_emitter name="emitter" type="box">
+        <emitting>true</emitting>
+        <pose>1.0 0 1.7 0 0 0</pose>
+        <size>0.5 0.5 0.5</size> <!-- The size of the fog depends on the area that is going to have the fog x, z, y-->
+        <particle_size>100 100 100</particle_size>
+        <lifetime>${fog_lifetime}</lifetime>
+        <min_velocity>0.1</min_velocity>
+        <max_velocity>0.2</max_velocity>
+        <scale_rate>0.5</scale_rate>
+        <rate>${fog_rate}</rate>
+        <material>
+          <diffuse>0.7 0.7 0.7</diffuse>
+          <specular>1.0 1.0 1.0</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://FogGenerator/materials/textures/fog.png</albedo_map>
+            </metal>
+          </pbr>
+        </material>
+        <color_range_image>model://FogGenerator/materials/textures/fogcolors.png</color_range_image>
+      </particle_emitter>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

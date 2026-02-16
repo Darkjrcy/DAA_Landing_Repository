@@ -1,0 +1,319 @@
+<?xml version="1.0" ?>
+<robot name="airplane" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <!-- Add the Gazebo xacro file-->
+    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/airplane_gazebo.xacro"/>
+    <!-- Add the for spawner file-->
+    <xacro:include filename="$(find plane_description)/urdf/fixed_wing/add_fog.xacro"/>
+
+    <xacro:macro name="airplane" params="robot_scale robot_name camera_num world_name initial_alt fog_lifetime fog_rate enable_fog">
+        <!-- LINK SECTIONS OF THE AIRPLANE-->
+        <!-- Dummy link -->
+        <link name="base_link"/>
+        
+        <!-- Links of the airplane structure-->
+        <link name="airplane_link">
+            <inertial>
+                <mass value="${680.389 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${1285.315427874 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${1824.930976707 * robot_scale**5}" iyz="0"
+                        izz="${2666.893931043 * robot_scale**5}" />
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/body.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/body.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- left_aileron_link -->
+        <link name="left_aileron_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${0.8434 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.0119 * robot_scale**5}" iyz="0" izz="${0.855 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_aileron.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_aileron.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- left_flap_link -->
+        <link name="left_flap_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${0.6747 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.0242 * robot_scale**5}" iyz="0" izz="${0.6962 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_flap.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/left_flap.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- right_aileron_link -->
+        <link name="right_aileron_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${0.8434 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.0119 * robot_scale**5}" iyz="0" izz="${0.855 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_aileron.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_aileron.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- right_flap_link -->
+        <link name="right_flap_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${0.6747 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.0242 * robot_scale**5}" iyz="0" izz="${0.6962 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_flap.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/right_flap.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- elevators_link -->
+        <link name="elevators_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${1.5008 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.0274 * robot_scale**5}" iyz="0" izz="${1.5266 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/elevators.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/elevators.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- rudder_link -->
+        <link name="rudder_link">
+            <inertial>
+                <mass value="${2 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${0.4708 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${0.5208 * robot_scale**5}" iyz="0" izz="${0.0508 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/rudder.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/rudder.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- propeller_link -->
+        <link name="propeller_link">
+            <inertial>
+                <mass value="${18.37 * robot_scale**3}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="${7.5067 * robot_scale**5}" ixy="0" ixz="0"
+                        iyy="${7.5150 * robot_scale**5}" iyz="0" izz="${0.068275 * robot_scale**5}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/cessna_prop.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find plane_description)/meshes/Cessna/cessna_prop.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        
+        <!-- Fixed joint to dummy link -->
+        <joint name="base_to_airplane" type="fixed">
+            <parent link="base_link"/>
+            <child link="airplane_link"/>
+        </joint>
+        <!-- Joitns of the model-->
+        <joint name="left_aileron_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="left_aileron_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/> 
+        </joint>
+
+        <joint name="left_flap_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="left_flap_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0 0.0"/>
+        </joint>
+
+        <joint name="right_aileron_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="right_aileron_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0 0.0"/> 
+        </joint>
+
+        <joint name="right_flap_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="right_flap_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0 0.0"/>
+        </joint>
+
+        <joint name="elevators_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="elevators_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0 0.0"/>
+        </joint>
+
+        <joint name="rudder_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="rudder_link"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0 0.0"/>
+        </joint>
+
+        <joint name="propeller_joint" type="fixed">
+            <parent link="airplane_link"/>
+            <child link="propeller_link"/>
+            <origin xyz="${1.79 * robot_scale} 0.0 ${0.855 * robot_scale}" rpy="1.5708 0 0.0"/>
+        </joint>
+
+
+        <!-- Link of the sensors by Jorge -->
+        <!-- Frontal camera link:-->
+        <link name="frontal_camera_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+        <!-- GNSS Link for the Lidar sensor-->
+        <link name="lidar_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+
+
+        <!-- Joint of the sensors or plugin requirements -->
+        <!-- Frontal camera fized joint-->
+        <joint name="frontal_camera_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="${1.05 * robot_scale} 0.0 0.0"/>
+            <parent link="airplane_link"/>
+            <child link="frontal_camera_link"/>
+        </joint>
+        <!-- GNSS Lidar link-->
+        <joint name="lidar_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="0.0 0.0 ${1.7 * robot_scale}"/>
+            <parent link="airplane_link"/>
+            <child link="lidar_link"/>
+        </joint>
+
+
+        <!-- Add a camera to follow the Airplane -->
+        <link name="follow_camera_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+
+        <joint name="follow_camera_link_joint" type="fixed">
+            <origin rpy="0 0.2 0" xyz="${-8.0 * robot_scale} 0.0 ${4.2 * robot_scale}"/>
+            <parent link="base_link"/>
+            <child link="follow_camera_link"/>
+        </joint>
+
+
+        <!-- Input the gazebo sim pluggin xacro document-->
+        <xacro:airplane_sim robot_name="$(arg robot_name)" camera_num="$(arg camera_num)" robot_scale="$(arg robot_scale)" world_name="$(arg world_name)" initial_alt="$(arg initial_alt)"/>
+
+        <!-- Add the fog only if it is required -->
+        <xacro:if value="$(arg enable_fog)">
+            <xacro:add_fog robot_scale="$(arg robot_scale)" fog_lifetime="$(arg fog_lifetime)" fog_rate="$(arg fog_rate)"/>
+        </xacro:if>
+    </xacro:macro>
+
+
+</robot>

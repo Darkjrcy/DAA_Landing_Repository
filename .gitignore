@@ -1,0 +1,8 @@
+# Ignore all the subdirectories inside the models folder:
+ros_ws/src/uav_bringup/models/*
+
+# Ignore the installation folders that are created from the installation:
+ros_ws/build/*
+ros_ws/install/*
+ros_ws/log/*
+
