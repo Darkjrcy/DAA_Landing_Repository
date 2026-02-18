@@ -4,4 +4,4 @@
 [submodule "ros_ws/src/gnss_multipath_plugin"]
 	path = ros_ws/src/gnss_multipath_plugin
 	url = https://github.com/Darkjrcy/gnss_multipath_plugin.git
-	branch = Migration2GazeboSim
+	branch = Migration2GazeboSim_Garden
