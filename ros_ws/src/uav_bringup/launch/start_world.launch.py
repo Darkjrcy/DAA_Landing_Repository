@@ -31,7 +31,8 @@ def launch_setup(context, *args, **kargs):
 
     # Add the airpalne movement plugin path:
     movement_plugins_lib = os.path.join(get_package_share_directory('movement_plugin'), '..', '..', 'lib')
-
+    # Add the gnss plugin path
+    gnss_plugin_lib = os.path.join(get_package_share_directory('gnss_multipath_plugin'), '..', '..', 'lib')
 
     # Return the launhc command:
     return [
@@ -43,7 +44,7 @@ def launch_setup(context, *args, **kargs):
         # Add the custom movement plugins path
         AppendEnvironmentVariable(
             'GZ_SIM_SYSTEM_PLUGIN_PATH',
-            f"{movement_plugins_lib}"  # To add more use :{},
+            f"{movement_plugins_lib}:{gnss_plugin_lib}"  # To add more use :{},
         ),
         # Open the world:
         ExecuteProcess(
