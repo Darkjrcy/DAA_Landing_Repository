@@ -267,6 +267,20 @@
                 <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
             </inertial>
         </link>
+        <!--IMU Link for teh ADS-B Reciever-->
+        <link name="imu_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
 
 
         <!-- Joint of the sensors or plugin requirements -->
@@ -276,11 +290,17 @@
             <parent link="airplane_link"/>
             <child link="frontal_camera_link"/>
         </joint>
-        <!-- GNSS Lidar link-->
+        <!-- GNSS Lidar joint-->
         <joint name="lidar_link_joint" type="fixed">
             <origin rpy="0 0 0" xyz="0.0 0.0 ${1.7 * robot_scale}"/>
             <parent link="airplane_link"/>
             <child link="lidar_link"/>
+        </joint>
+        <!-- IMU lidar joint-->
+        <joint name="imu_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+            <parent link="airplane_link"/>
+            <child link="imu_link"/>
         </joint>
 
 
