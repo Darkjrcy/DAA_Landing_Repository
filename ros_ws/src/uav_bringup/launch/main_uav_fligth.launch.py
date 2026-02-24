@@ -21,9 +21,9 @@ def get_world_name(world):
 def generate_launch_description():
     # Launch Arguments:
     # Type of the UAV (fixed_wing):
-    type_uav = "fixed_wing"
+    type_uav = "vtol"
     # Launch airplane arguments:
-    robot_name = "airplane_1"
+    robot_name = "vtol_1"
     robot_scale = "0.7"
     camera_num = "1.0"
     # Launch arguments for the world:

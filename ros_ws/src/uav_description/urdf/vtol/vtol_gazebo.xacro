@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<robot name="vtol_sim" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <!-- Gaussian std deviation on the pixels applied to the cameras -->
+    <xacro:property name="camera_noise_stddev" default="0.05"/>
+    <!-- Define the vertical angular limit that the GNSS analize the multipath-->
+    <xacro:property name="max_gnss_lidar_ver" default="1.05"/>
+
+    <xacro:macro name="vtol_sim" params="robot_name camera_num robot_scale world_name initial_alt">
+        
+        <!-- Add the frontal camera sensor -->
+        <gazebo reference="frontal_camera_link">
+            <sensor name="frontal_camera" type="camera">
+                <always_on>true</always_on>
+                <update_rate>30</update_rate>
+                <visualize>true</visualize>
+                <camera>
+                    <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
+                    <image>
+                        <width>${(2832 * camera_num)}</width>
+                        <height>2360</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>2000</far>
+                    </clip>
+                </camera>
+            </sensor>
+        </gazebo>
+
+
+
+        <!-- Add a camera to follow the Airplane -->
+        <gazebo reference="follow_camera_link">
+            <sensor name="follow_camera" type="camera">
+                <always_on>true</always_on>
+                <update_rate>30</update_rate>
+                <visualize>true</visualize>
+                <camera>
+                    <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
+                    <image>
+                        <width>${(3210 * camera_num)}</width>
+                        <height>2360</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>2000</far>
+                    </clip>
+                </camera>
+            </sensor>
+        </gazebo>
+
+
+
+        <!-- Add the 3d Movement plugin for Gazebo-->
+        <gazebo>
+            <plugin name="movement_3d_plugin" filename="libmovement_3d_plugin.so">
+                <cmdVelTopic>${robot_name}/cmd_vel</cmdVelTopic>
+                <statesFrame>${robot_name}</statesFrame>
+                <robotBaseFrame>base_link</robotBaseFrame>
+            </plugin>
+        </gazebo>
+
+
+
+        <!-- Add the Lidar sensor for the GNSS-->
+        <gazebo reference = "lidar_link">
+            <sensor name = "lidar_link" type = "gpu_lidar">
+                <update_rate>10</update_rate>  <!-- Here is the update rate of teh GNSS-->
+                <ray>
+                    <scan>
+                        <horizontal>
+                            <samples>4</samples>
+                            <resolution>0.5</resolution>
+                            <min_angle>-3.1416</min_angle>
+                            <max_angle>3.1416</max_angle>
+                        </horizontal>
+                        <vertical>
+                            <samples>2</samples>
+                            <resolution>0.5</resolution>
+                            <min_angle>0</min_angle>
+                            <max_angle>${max_gnss_lidar_ver}</max_angle>
+                        </vertical>
+                    </scan>
+                    <range>
+                        <min>${(robot_scale * 10.0)}</min>
+                        <max>8.0</max>
+                        <resolution>1.5</resolution>
+                    </range>
+                </ray>
+                <always_on>1</always_on>
+                <visualize>false</visualize>
+            </sensor>
+        </gazebo>
+        <gazebo>
+            <plugin name="gnss_lidar_plugin" filename="libgnss_multipath_plugin_node.so">
+                <MaxSatellites>20</MaxSatellites>
+                <cmdGNSSTopic>${robot_name}/gnss_multipath_fix</cmdGNSSTopic>
+                <topic>/world/${world_name}/model/${robot_name}/link/base_link/sensor/lidar_link/scan/points</topic> <!-- Must match the GPU LiDAR topic published by Gazebo -->
+                <frame_id>${robot_name}/base_link/lidar_link</frame_id>
+                <disableNoise>0</disableNoise>
+                <pub_ros2>0</pub_ros2>
+                <origin_latitude>42.47</origin_latitude> 
+                <origin_longitude>-71.28</origin_longitude>
+                <origin_altitude>0</origin_altitude>
+                <ElevationLimit>${max_gnss_lidar_ver}</ElevationLimit>
+            </plugin>
+        </gazebo>
+
+
+        <!--IMU link that works as the ADS-B reciever-->
+        <gazebo reference="imu_link">
+            <sensor name="imu_sensor" type="imu">
+                <always_on>1</always_on>
+                <update_rate>100</update_rate> 
+                <visualize>true</visualize>
+                <topic>${robot_name}/imu/out</topic> 
+                <imu></imu>
+            </sensor>
+        </gazebo>
+        <gazebo>
+            <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu">
+            </plugin>
+        </gazebo>
+        <gazebo>
+             <plugin name="adsb_plugin" filename="libadsb_plugin.so">
+                <topic>${robot_name}/imu/out</topic> 
+                <cmdGNSSTopic>${robot_name}/gnss_multipath_fix</cmdGNSSTopic>
+                <frame_id>${robot_name}/base_link/imu_link</frame_id>
+                <cmdADSBTopic>${robot_name}/adsb_info</cmdADSBTopic>
+                <adsb_start_srv_stopic>${robot_name}/restart_adsb</adsb_start_srv_stopic>
+            </plugin>
+        </gazebo>
+        
+   
+    </xacro:macro>
+</robot>

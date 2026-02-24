@@ -1,0 +1,426 @@
+<?xml version="1.0" ?>
+<robot name="vtol" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <!-- Add the Gazebo xacro file-->
+    <xacro:include filename="$(find uav_description)/urdf/vtol/vtol_gazebo.xacro"/>
+    <!-- Add the for spawner file-->
+    <xacro:include filename="$(find uav_description)/urdf/fixed_wing/add_fog.xacro"/>
+
+    <xacro:macro name="vtol" params="robot_scale robot_name camera_num world_name initial_alt fog_lifetime fog_rate enable_fog">
+        <!-- LINK SECTIONS OF THE VTOL-->
+        <!-- Dummy link -->
+        <link name="base_link"/>
+        
+        <!-- Links of the VTOL structure-->
+        <link name="vtol_body">
+            <inertial>
+                <mass value="${2028.7 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${1285.315427874 * pow(robot_scale, 5)}" ixy="0" ixz="0" 
+                        iyy="${1824.930976707 * pow(robot_scale, 5)}" iyz="0" 
+                        izz="${2666.893931043 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/body.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/body.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!--Rotor 1 (Counter-Clockwise rotation)-->
+        <link name="rotor1">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor1.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor1.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!--Rotor 4 (Counter-Clockwise rotation)-->
+        <link name="rotor4">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                    iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                    izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor7.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor7.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!--Rotor 5 (Counter-Clockwise rotation)-->
+        <link name="rotor5">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor2.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor2.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!--Rotor 8 (Counter-Clockwise rotation)-->
+        <link name="rotor8">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor8.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor8.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Rotor 2 (Clockwise rotation)-->
+        <link name="rotor2">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor3.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor3.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Rotor 3 (Clockwise rotation)-->
+        <link name="rotor3">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor5.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor5.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Rotor 6 (Clockwise rotation)-->
+        <link name="rotor6">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor4.dae"
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor4.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Rotor 7 (Clockwise rotation)-->
+        <link name="rotor7">
+            <inertial>
+                <mass value="${63.93 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor6.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor6.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <!-- Propeller rotor -->
+        <link name="rotor9">
+            <inertial>
+                <mass value="${112.91 * pow(robot_scale, 3)}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+                <inertia ixx="${0.001 * pow(robot_scale, 5)}" ixy="0.0" ixz="0.0"
+                        iyy="${0.001 * pow(robot_scale, 5)}" iyz="0.0"
+                        izz="${0.001 * pow(robot_scale, 5)}"/>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor9.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </collision>
+
+            <visual name="visual">
+                <geometry>
+                <mesh filename="file://$(find uav_description)/meshes/VTOL/rotor9.dae" 
+                        scale="${robot_scale} ${robot_scale} ${robot_scale}"/>
+                </geometry>
+            </visual>
+        </link>
+    
+
+       
+
+        
+        <!-- Fixed joint to dummy link -->
+        <joint name="vtol_joint" type="fixed">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.5708"/>
+            <parent link="base_link"/>
+            <child link="vtol_body"/>
+        </joint>
+        <!-- Counter clockwise rotors -->
+        <joint name="rotor1_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor1"/>
+            <origin xyz="${8.85* robot_scale} ${18.75 * robot_scale} ${6.7861 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0 1"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor4_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor4"/>
+            <origin xyz="${8.85 * robot_scale} ${-18.75 * robot_scale} ${6.7861 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0 1"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor5_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor5"/>
+            <origin xyz="${-5.28 * robot_scale} ${18.75 * robot_scale} ${9.0661 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0 1"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor8_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor8"/>
+            <origin xyz="${-5.28 * robot_scale} ${-18.75 * robot_scale} ${9.0661 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0 1"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <!--Clockwise rotors -->
+        <joint name="rotor2_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor2"/>
+            <origin xyz="${9.289 * robot_scale} ${8.1378 * robot_scale} ${7.0955 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0.139 -0.99"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor3_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor3"/>
+            <origin xyz="${9.289 * robot_scale} ${-8.4578 * robot_scale} ${7.0955 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 -0.139 -0.99"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor6_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor6"/>
+            <origin xyz="${-4.84 * robot_scale} ${8.4578 * robot_scale} ${9.3555 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 0.139 -0.99"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <joint name="rotor7_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor7"/>
+            <origin xyz="${-4.84 * robot_scale} ${-8.4578 * robot_scale} ${9.3555 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="0 -0.139 -0.99"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+        <!--Propulsion rotors -->
+        <joint name="rotor9_joint" type="continuous">
+            <parent link="vtol_body"/>
+            <child link="rotor9"/>
+            <origin xyz="${-18.062* robot_scale} ${0 * robot_scale} ${7.79 * robot_scale}" rpy="0 0 0"/>
+            <axis xyz="-1 0 0"/>
+            <dynamics damping="0.01" friction="0.0"/>
+        </joint>
+
+
+        <!-- Link of the sensors by Jorge -->
+        <!-- Frontal camera link:-->
+        <link name="frontal_camera_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+        <!-- GNSS Link for the Lidar sensor-->
+        <link name="lidar_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+        <!--IMU Link for teh ADS-B Reciever-->
+        <link name="imu_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+
+
+        <!-- Joint of the sensors or plugin requirements -->
+        <!-- Frontal camera fized joint-->
+        <joint name="frontal_camera_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="${1.05 * robot_scale} 0.0 0.0"/>
+            <parent link="vtol_body"/>
+            <child link="frontal_camera_link"/>
+        </joint>
+        <!-- GNSS Lidar joint-->
+        <joint name="lidar_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="0.0 0.0 ${1.7 * robot_scale}"/>
+            <parent link="vtol_body"/>
+            <child link="lidar_link"/>
+        </joint>
+        <!-- IMU lidar joint-->
+        <joint name="imu_link_joint" type="fixed">
+            <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+            <parent link="vtol_body"/>
+            <child link="imu_link"/>
+        </joint>
+
+
+        <!-- Add a camera to follow the vtol -->
+        <link name="follow_camera_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.02 * robot_scale} ${0.02 * robot_scale} ${0.02 * robot_scale}"/>
+                </geometry>
+            </visual>
+            <inertial>
+                <mass value="${0.001 * robot_scale}" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00000015" ixy="0" ixz="0" iyy="0.00000015" iyz="0" izz="0.00000015" />
+            </inertial>
+        </link>
+
+        <joint name="follow_camera_link_joint" type="fixed">
+            <origin xyz="${-36.08 * robot_scale} 0.0 ${20.0 * robot_scale}" rpy="0.0 0.5 0.0"/>
+            <parent link="base_link"/>
+            <child link="follow_camera_link"/>
+        </joint>
+
+
+        <!-- Input the gazebo sim pluggin xacro document-->
+        <xacro:vtol_sim robot_name="$(arg robot_name)" camera_num="$(arg camera_num)" robot_scale="$(arg robot_scale)" world_name="$(arg world_name)" initial_alt="$(arg initial_alt)"/>
+
+        <!-- Add the fog only if it is required -->
+        <xacro:if value="$(arg enable_fog)">
+            <xacro:add_fog robot_scale="$(arg robot_scale)" fog_lifetime="$(arg fog_lifetime)" fog_rate="$(arg fog_rate)"/>
+        </xacro:if>
+    </xacro:macro>
+
+
+</robot>
