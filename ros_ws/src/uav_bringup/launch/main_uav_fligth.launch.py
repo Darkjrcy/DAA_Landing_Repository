@@ -90,6 +90,7 @@ def generate_launch_description():
         arguments = [
             [f'/world/',world_name,'/model/',robot_name,'/link/base_link/sensor/follow_camera/image','@sensor_msgs/msg/Image[gz.msgs.Image'],
             [f'/world/', world_name, '/model/',robot_name,'/link/base_link/sensor/follow_camera/camera_info','@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo'],
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
         ],
         remappings = [
             ([f'/world/',world_name,'/model/',robot_name,'/link/base_link/sensor/follow_camera/image'],[f'/',robot_name,'/camera/image_raw']),

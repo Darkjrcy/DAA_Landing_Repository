@@ -18,6 +18,7 @@ find_package(gz-sim7 REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(gz-common5 REQUIRED)
 find_package(gz-math7 REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(gz-plugin2 REQUIRED COMPONENTS register)
 
 if(BUILD_TESTING)
@@ -49,6 +50,7 @@ ament_target_dependencies(movement_3d_plugin
   "tf2_ros"
   "gz-sim7"
   "gz-plugin2"
+  "nav_msgs"
   "gz-common5"
   "gz-math7"
 )

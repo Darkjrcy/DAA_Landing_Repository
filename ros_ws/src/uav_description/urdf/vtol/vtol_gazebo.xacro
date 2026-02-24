@@ -57,8 +57,9 @@
         <!-- Add the 3d Movement plugin for Gazebo-->
         <gazebo>
             <plugin name="movement_3d_plugin" filename="libmovement_3d_plugin.so">
-                <cmdVelTopic>${robot_name}/cmd_vel</cmdVelTopic>
+                <cmdVelTopic>cmd_vel</cmdVelTopic>
                 <statesFrame>${robot_name}</statesFrame>
+                <update_rate>10</update_rate>
                 <robotBaseFrame>base_link</robotBaseFrame>
             </plugin>
         </gazebo>
@@ -126,11 +127,12 @@
         </gazebo>
         <gazebo>
              <plugin name="adsb_plugin" filename="libadsb_plugin.so">
+                <statesFrame>${robot_name}</statesFrame>
                 <topic>${robot_name}/imu/out</topic> 
                 <cmdGNSSTopic>${robot_name}/gnss_multipath_fix</cmdGNSSTopic>
                 <frame_id>${robot_name}/base_link/imu_link</frame_id>
-                <cmdADSBTopic>${robot_name}/adsb_info</cmdADSBTopic>
-                <adsb_start_srv_stopic>${robot_name}/restart_adsb</adsb_start_srv_stopic>
+                <cmdADSBTopic>adsb_info</cmdADSBTopic>
+                <adsb_start_srv_stopic>restart_adsb</adsb_start_srv_stopic>
             </plugin>
         </gazebo>
         

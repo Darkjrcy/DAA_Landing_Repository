@@ -16,7 +16,7 @@ namespace movement_3d_plugin
 {
   class Movement3DPluginPrivate;
 
-  class Movement3DPlugin:public gz::sim::System, public gz::sim::ISystemConfigure, public gz::sim::ISystemPreUpdate
+  class Movement3DPlugin:public gz::sim::System, public gz::sim::ISystemConfigure, public gz::sim::ISystemPreUpdate, public gz::sim::ISystemPostUpdate
   {
     public:
     //Constructor:
@@ -27,6 +27,8 @@ namespace movement_3d_plugin
     void Configure(const gz::sim::Entity &entity,const std::shared_ptr<const sdf::Element> &sdf,gz::sim::EntityComponentManager &ecm,gz::sim::EventManager &eventMgr) override;
     //Update the velocity:
     void PreUpdate(const gz::sim::UpdateInfo &info,gz::sim::EntityComponentManager &ecm) override;
+    // Publisht eh odometry:
+    void PostUpdate(const gz::sim::UpdateInfo &_info,const gz::sim::EntityComponentManager &_ecm) override;
 
   private:
     std::unique_ptr<Movement3DPluginPrivate> impl_;
