@@ -88,7 +88,9 @@ namespace movement_3d_plugin{
         }
 
         // Create a ROS 2 node with name based on the state_frame:
-        impl_->ros_node_ = std::make_shared<rclcpp::Node>("movement_3d_node");
+        rclcpp::NodeOptions options;
+        options.arguments({ "--ros-args", "-r", "__ns:=/" + impl_->states_frame_ });
+        impl_->ros_node_ = std::make_shared<rclcpp::Node>("movement_3d_node", options);
         RCLCPP_WARN(impl_->ros_node_->get_logger(), "ROS 2 node movemendt initialized.");
         std::thread([node = impl_->ros_node_]() {
             rclcpp::executors::SingleThreadedExecutor exec;
