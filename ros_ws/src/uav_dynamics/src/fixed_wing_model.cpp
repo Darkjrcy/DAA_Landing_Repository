@@ -24,8 +24,8 @@ class FixedWingDynamics : public rclcpp::Node{
     public:
         // Do the starting function:
         FixedWingDynamics(const std::string &avoider_name, const std::string &waypoints_str, 
-            const std::string guidance_system, const bool active_avoidance, const std::string guidance_type
-            ): Node(("dynamics_" + avoider_name).c_str()), avoider_name_(avoider_name), guidance_type_(guidance_type), active_avoidance_(active_avoidance){
+            const std::string guidance_system, const bool active_avoidance
+            ): Node(("dynamics_" + avoider_name).c_str()), avoider_name_(avoider_name), guidance_system_(guidance_system), active_avoidance_(active_avoidance){
 
                 // Qualioty of serviuce for the states messages:
                 auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliability(rclcpp::ReliabilityPolicy::Reliable).durability(rclcpp::DurabilityPolicy::Volatile);
@@ -46,7 +46,7 @@ class FixedWingDynamics : public rclcpp::Node{
                 std::string mission_start_topc = "/mission_starts";
 
                 // Specify the vearibles used for the differnt Guidance ALgorithms:
-                if (active_avoidance_ && guidance_type_ == "GEOMETRIC") {
+                if (active_avoidance_ && guidance_system_ == "GEOMETRIC") {
                     avoidance_vars_geom_ = GeometricAvoidanceVars{
                         180, // min_radius of turn (m)
                         0.1 // critical avoidance time (s)
@@ -79,7 +79,7 @@ class FixedWingDynamics : public rclcpp::Node{
         // Define the avoider_name of the model:
         std::string avoider_name_;
         // DEfine if the avoidance is active and the guidance technique:
-        std::string guidance_type_;
+        std::string guidance_system_;
         bool active_avoidance_;
 
 
@@ -336,7 +336,7 @@ class FixedWingDynamics : public rclcpp::Node{
 
             // Identify if the avoidance maneuver is compelted and restard the following varibales in case is required:
             if (active_avoidance_){
-                if (guidance_type_ == "GEOMETRIC"){
+                if (guidance_system_ == "GEOMETRIC"){
                     if (start_the_avoidance) {
                         const Eigen::Vector3d avoidance_last_point_ned = ENU_to_NED(avoidance_last_point_enu.value()); // (N,E,-U)
 
@@ -405,7 +405,7 @@ class FixedWingDynamics : public rclcpp::Node{
             }
 
             // Call the guidance logic:
-            if (guidance_type_ == "GEOMETRIC" && avoidance_vars_geom_.has_value()) {
+            if (guidance_system_ == "GEOMETRIC" && avoidance_vars_geom_.has_value()) {
                 NavigationState nav_state{
                     waypoints_, 
                     cmd_vel_, 
@@ -479,7 +479,7 @@ int main(int argc, char **argv){
     if (argc < 6)
     {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), 
-                     "Usage: ros2 run <package_name> <executable_name> <avoider_name> <waypoints_string> <guidance_system> <active_avoidance (0 or 1)> <guidance_type>");
+                     "Usage: ros2 run <package_name> <executable_name> <avoider_name> <waypoints_string> <guidance_system> <active_avoidance (0 or 1)>");
         return 1;
     }
 
@@ -488,10 +488,9 @@ int main(int argc, char **argv){
     std::string waypoints_str = argv[2];
     std::string guidance_system = argv[3];
     bool active_avoidance = (std::stoi(argv[4]) != 0); 
-    std::string guidance_type = argv[5];
 
     // Start the node with teh class:
-    auto node = std::make_shared<FixedWingDynamics>(avoider_name, waypoints_str, guidance_system, active_avoidance, guidance_type);
+    auto node = std::make_shared<FixedWingDynamics>(avoider_name, waypoints_str, guidance_system, active_avoidance);
 
     // SPin the node:
     rclcpp::executors::SingleThreadedExecutor exec;
