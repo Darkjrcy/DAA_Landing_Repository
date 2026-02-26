@@ -6,6 +6,7 @@
 #include "gnss_multipath_plugin/msg/adsb_info.hpp"
 #include "rosgraph_msgs/msg/clock.hpp"
 // C++ libraries:
+#include <iostream>
 #include <string>
 #include <optional>
 #include <vector>
@@ -55,29 +56,35 @@ struct Adsb_unit {
 // Generate the class of the executable:
 class SaveUAVInfo : public rclcpp::Node{
     public:
-        SaveUAVInfo(const std::string &model_name) : rclcpp::Node(("save_info_" + model_name).c_str()), model_name_(model_name){
+        SaveUAVInfo(const std::string &model_name, const std::string &save_dir) : rclcpp::Node(("save_info_" + model_name).c_str()), model_name_(model_name){
             // Declare the topic parameters:
             std::string states_topic = model_name_ + "/states";
             std::string adsb_info_topic = model_name_ + "/adsb_info";
-            std::string start_save_trigger_topic = "/start_saving";
+            std::string mission_start_topic = "/mission_starts";
+            // Declare the saving directory:
+            save_dir_ = save_dir;
 
             // Declare a saving rate parameter:
             update_rate_ = this->declare_parameter<double>("update_rate", 10.0);
 
             // Define the subscriptions to the states and adsb_info:
             states_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(states_topic, 10,
-                            [this](const nav_msgs::msg::Odometry &msg) {std::lock_guard<std::mutex> lock(mutex_);last_usv_state_ = msg;});
+                            [this](const nav_msgs::msg::Odometry &msg) {std::lock_guard<std::mutex> lock(mutex_);last_uav_state_ = msg;});
             adsb_sub_ = this->create_subscription<gnss_multipath_plugin::msg::AdsbInfo>(states_topic, 10,
                             [this](const gnss_multipath_plugin::msg::AdsbInfo &msg) {std::lock_guard<std::mutex> lock(mutex_);last_adsb_ = msg;});
             // Sunscribe to the clock to oabtin the simulation time:
             clock_cub_ = this->create_subscription<rosgraph_msgs::msg::Clock>("/clock", 10, std::bind(&SaveUAVInfo::clock_callback, this, std::placeholders::_1));
-            // Topic to restart the recording or start it:
-            start_recording_sub_ = this->create_subscription<std_msgs::msg::Bool>( start_save_trigger_topic, 10,
+
+            // Topic to restart the recording or start it with the mission:
+            rclcpp::QoS qos_profile(1);
+            qos_profile.transient_local();
+            qos_profile.reliable();
+            start_recording_sub_ = this->create_subscription<std_msgs::msg::Bool>( mission_start_topic, qos_profile,
                 std::bind(&SaveUAVInfo::start_recording_callback, this, std::placeholders::_1));
 
             // TImer to save the information in a specfici upfate rate:
             auto timer_period = std::chrono::milliseconds(static_cast<int>(1000.0 / update_rate_));
-            timer_ = this->create_wall_timer(timer_period, td::bind(&SaveUAVInfo::timer_callback, this));
+            timer_ = this->create_wall_timer(timer_period, std::bind(&SaveUAVInfo::timer_callback, this));
         }
     
     private:
@@ -85,8 +92,14 @@ class SaveUAVInfo : public rclcpp::Node{
         double update_rate_;
         // Name of the UAV model in Gazebo:
         std::string model_name_;
+        // Saving directory path:
+        std::string save_dir_;
         // Simualtion time fom gz sim clock:
         double sim_time_ = 0.0;
+        // Initial simualtion time:
+        double sim_time_0_ = 0.0;
+        // Intiial real time:
+        double real_time_0_ = 0.0;
 
         // Boolean variable ot see if we need to estart:
         bool is_recording_ = false;
@@ -131,11 +144,22 @@ class SaveUAVInfo : public rclcpp::Node{
         // Callback to restart the recording of data:
         void start_recording_callback(const std_msgs::msg::Bool::SharedPtr msg) {
             // Start th recording only if its true:
-            if (msg.data && count_sim_==0) {
+            if (msg->data && count_sim_==0) {
                 is_recording_ = true;
+                // Clear the history:
+                odom_history_.clear();
+                adsb_history_.clear();
+                sim_time_0_ = sim_time_;
+                real_time_0_ = this->get_clock()->now().seconds();
                 count_sim_ += 1;
-            } else if (msg.data && count_sim > 0){
-                // Add function to save the data HERE!!!!!
+            } else if (msg->data && count_sim_ > 0){
+                // Save the information before restarting the vectors:
+                save_to_csv();
+                // Clear the history:
+                odom_history_.clear();
+                adsb_history_.clear();
+                sim_time_0_ = sim_time_;
+                real_time_0_ = this->get_clock()->now().seconds();
                 is_recording_ = true;
                 count_sim_ += 1;
             }
@@ -177,8 +201,8 @@ class SaveUAVInfo : public rclcpp::Node{
 
                 // Save in the vector:
                 Odom_unit odom_unity;
-                odom_unity.sim_time = sim_time_;
-                odom_unity.real_time = current_real_time;
+                odom_unity.sim_time = sim_time_ - sim_time_0_;
+                odom_unity.real_time = current_real_time - real_time_0_;
                 odom_unity.pos_east_real = last_uav_state_->pose.pose.position.x;
                 odom_unity.pos_north_real = last_uav_state_->pose.pose.position.y;
                 odom_unity.pos_up_real = last_uav_state_->pose.pose.position.z;
@@ -197,11 +221,11 @@ class SaveUAVInfo : public rclcpp::Node{
             // Save the ADS-B:
             if (last_adsb_.has_value()) {
             Adsb_unit adsb_unity;
-            adsb_unity.sim_time = sim_time_;
-            adsb_unity.real_time = current_real_time;
-            adsb_unity.north = last_adsb_->north;
-            adsb_unity.east = last_adsb_->east;
-            adsb_unity.up = last_adsb_->up;
+            adsb_unity.sim_time = sim_time_ - sim_time_0_;
+            adsb_unity.real_time = current_real_time - real_time_0_;
+            adsb_unity.pos_north = last_adsb_->north;
+            adsb_unity.pos_east = last_adsb_->east;
+            adsb_unity.pos_up = last_adsb_->up;
             adsb_unity.v_north = last_adsb_->v_north;
             adsb_unity.v_east = last_adsb_->v_east;
             adsb_unity.v_up = last_adsb_->v_up;
@@ -214,4 +238,80 @@ class SaveUAVInfo : public rclcpp::Node{
             adsb_history_.push_back(adsb_unity);
             }
         }
+
+
+
+        // Function to save the data
+        void save_to_csv(){
+            // Check if both vectors have information:
+            if (!odom_history_.empty() && !adsb_history_.empty()){
+                // Ensure that the data is safetly saved
+                std::lock_guard<std::mutex> lock(mutex_);
+                // Define the file name:
+                std::string save_filename = save_dir_ + model_name_ + "data" + std::to_string(count_sim_) + ".csv";
+                std::ofstream save_file(save_filename);
+
+                // Define the size of the vectors:
+                size_t num_records = std::min(odom_history_.size(), adsb_history_.size());
+
+                // Open both systems:
+                if (save_file.is_open()){
+                    // Write the csv header:
+                    save_file << "sim_time,real_time,pos_east_real,pos_north_real,pos_up_real,"
+                            << "course_real,fpa_real,roll_real,vel_east_real,vel_north_real,vel_up_real,"
+                            << "p_real,q_real,r_real,pos_east_est,pos_north_est,pos_up_est,"
+                            << "course_est,fpa_est,roll_est,vel_east_est,vel_north_est,vel_up_est,"
+                            << "p_est,q_est,r_est\n";
+                    
+                    // Write the data rows
+                    for (size_t i = 0; i < num_records; ++i) {
+                        const auto& data_odom = odom_history_[i];
+                        const auto& data_adsb = adsb_history_[i];
+
+                        // Ensure we match the East, North, Up order defined in your header!
+                        save_file << data_odom.sim_time << "," << data_odom.real_time << ","
+                                  << data_odom.pos_east_real << "," << data_odom.pos_north_real << "," << data_odom.pos_up_real << ","
+                                  << data_odom.course_real << "," << data_odom.fpa_real << "," << data_odom.roll_real << ","
+                                  << data_odom.vel_east_real << "," << data_odom.vel_north_real << "," << data_odom.vel_up_real << ","
+                                  << data_odom.p << "," << data_odom.q << "," << data_odom.r << ","
+                                  // Now append the estimated (ADS-B) data
+                                  << data_adsb.pos_east << "," << data_adsb.pos_north << "," << data_adsb.pos_up << ","
+                                  << data_adsb.course << "," << data_adsb.fpa << "," << data_adsb.roll << ","
+                                  << data_adsb.v_east << "," << data_adsb.v_north << "," << data_adsb.v_up << ","
+                                  << data_adsb.p << "," << data_adsb.q << "," << data_adsb.r << "\n";
+                    }
+                    save_file.close();
+                // Add INFO messages:
+                RCLCPP_INFO(this->get_logger(), "Successfully saved combined data to %s", save_filename.c_str());
+                } else {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to open file %s for writing.", save_filename.c_str());
+                }
+            }
+        }
+};
+
+
+
+
+//starts the node:
+int main(int argc, char **argv) {
+    // Start the ROS2 node:
+    rclcpp::init(argc, argv);
+    // Obtain the arguments:
+    std::string model_name = "airplane_1";
+    std::string save_dir = "/home/jorge/DAA_Landing_Repository/ros_ws/src/uav_bringup/saving_data";
+    if (argc > 1) {
+        model_name = argv[1];
+        save_dir = argv[2];
+    }
+
+    // Create the node class:
+    auto node = std::make_shared<SaveUAVInfo>(model_name, save_dir);
+    
+    RCLCPP_INFO(node->get_logger(), "Recording node started for model: %s", model_name.c_str());
+    
+    // Spin teh NOde and close it when Ctrl+C is pressed
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
 }

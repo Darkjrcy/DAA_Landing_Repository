@@ -7,9 +7,33 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(rosgraph_msgs REQUIRED)
+find_package(gnss_multipath_plugin REQUIRED) 
+find_package(gz-math7 REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+
+# Add the ROS2 executable for saving the data:
+add_executable(save_uav_info_node src/save_uav_info.cpp)
+# Link teh dependencies:
+ament_target_dependencies(save_uav_info_node
+  "rclcpp"
+  "nav_msgs"
+  "std_msgs"
+  "rosgraph_msgs"
+  "gz-math7"
+  "gnss_multipath_plugin"
+)
+# Intall the executable:
+install(TARGETS save_uav_info_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
