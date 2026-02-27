@@ -655,22 +655,22 @@ class DAASimulation(Node):
 
     
 
-    # Start the saving nodes:
+    # Start the saving node:
     def start_saving_nodes(self, saving_directory):
-        for model in self.model_names:
-            save_args = [
-                "ros2", "run", "uav_bringup", "save_uav_info_node", model, saving_directory
-            ]
-            # Add it to the saving running process:
-            self.save_info_procs[model] = subprocess.Popen(save_args, start_new_session=True)
+        # STrat the saving node of teh ads-b adn the real states data:
+        save_args = [
+            "ros2", "run", "uav_bringup", "save_uav_info_node", saving_directory
+        ]
+        # Add the models name:
+        save_args.extend(self.model_names)
+        # Launch one process:
+        self.save_info_procs["central_saver"] = subprocess.Popen(save_args, start_new_session=True)
 
     
 
 
     # Define the main function of the DAA simulation:
     def daa_simulation_setup(self):
-        # Start the saving nodes:
-        self.start_saving_nodes()
         # Detect the number of encounters:
         first_model = self.model_names[0]
         if first_model in self.avoiders_info:
@@ -686,8 +686,75 @@ class DAASimulation(Node):
             self.restart_varibles()
             time.sleep(5)
 
-            # Start the plot to see how the airpalnes are moving:
+            # Create a new direction and start the saving nodes:
+            encounter_dir = os.path.join(self.save_dir, f"Encounter_{i}")
+            if not os.path.exists(encounter_dir):
+                os.makedirs(encounter_dir)
+            self.start_saving_nodes(encounter_dir)
+            self.mission_started = False
 
+            # Start the plotting:
+            self.setup_plot( i)
+            # Draw the plot:
+            plt.draw()
+            plt.pause(0.5)
+
+            # Spawn the avoiders:
+            for name, segments in self.avoiders_info.items():
+                self.spawn_the_UAV_using_waypoints(name, segments[i])
+            # Spawn the intruders:
+            for name, segments in self.intruders_info.items():
+                self.spawn_the_UAV_using_waypoints(name, segments[i])
+            
+            # Launch the uav dynamics process:
+            self.start_uav_dynamics(i)
+            # Wait a few seconds before stariting the mission:
+            self.get_logger().info("Waiting for UAV nodes to boot and connect.")
+            time.sleep(3.0)
+            # Start the mission:
+            self.start_the_mission()
+
+            # Wait until trajecotry complete:
+            while not self.traj_complete:
+                rclpy.spin_once(self, timeout_sec=0.1)
+
+            # Clean up all spawned subprocesses before looping to the next encounter
+            self.stop_wait_the_followers()
+
+            # Also kill the saving nodes!
+            for name, p in list(self.save_info_procs.items()):
+                if p.poll() is None:
+                    p.terminate()
+            self.save_info_procs.clear()
+        
+        # After all of them finishes stop teh simulation:
+        msg = Bool()
+        msg.data = True
+        self.stop_pub.publish(msg)
+
+                
+# Main Logic
+def main(args=None):
+    rclpy.init(args=args)
+    node = DAASimulation()
+    try:
+         node.daa_simulation_setup()
+    except KeyboardInterrupt:
+        node.get_logger().warn("Interrupted by user (Ctrl+C). Cleaning up...")
+        node._cleanup("KeyboardInterrupt")
+    except Exception as e:
+        node.get_logger().error(f"Unhandled exception: {e}. Cleaning up...")
+        node._cleanup("exception")
+        raise
+    finally:
+        # final safety net (idempotent)
+        node._cleanup("finally")
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
 
 
 

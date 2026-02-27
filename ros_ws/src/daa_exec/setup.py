@@ -24,6 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'daa_simulation = daa_exec.daa_simulation:main',
+            'stop_simulation = daa_exec.stop_simulation:main',
         ],
     },
 )

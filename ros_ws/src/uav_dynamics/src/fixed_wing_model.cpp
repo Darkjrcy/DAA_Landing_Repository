@@ -57,6 +57,11 @@ class FixedWingDynamics : public rclcpp::Node{
                 avoider_states_sub_ = this->create_subscription<gnss_multipath_plugin::msg::AdsbInfo>(
                     avoider_topic, qos, std::bind(&FixedWingDynamics::avoider_states_callback, this, std::placeholders::_1));
                 
+                // SUbscribe to the mission start to start all tehe avoidance:
+                mission_start_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+                    mission_start_topc, qos, std::bind(&FixedWingDynamics::mission_start_callback, this, std::placeholders::_1)
+                );
+                
                 // Subscribe to the obstacles states:
                 if (active_avoidance_){
                     obstacles_states_sub_ = this->create_subscription<uav_dynamics::msg::AvoidanceStates>(
@@ -110,6 +115,7 @@ class FixedWingDynamics : public rclcpp::Node{
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr complete_encounter_pub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr complete_encounter_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mission_start_sub_;
 
         // Variable to see when the UAV reaches the last waypoint:
         bool goal_reached_ = false;
@@ -179,6 +185,17 @@ class FixedWingDynamics : public rclcpp::Node{
 
 
 
+        // STrat the avoidance manuver or the movement:
+        void mission_start_callback(const std_msgs::msg::Bool::SharedPtr msg){
+            if (msg->data){
+                start_following = true;
+            } else {
+                return;
+            }
+        }
+
+
+
         // Define the Waypoint Follower using the HYperplane logic:
         NextGoalInformation WaypointFollower(const Eigen::Vector3d &pose, const std::vector<Eigen::Vector3d> &Waypoints, double look_ahead_distance,
                                     int init_idx, double transition_radius){
@@ -231,7 +248,7 @@ class FixedWingDynamics : public rclcpp::Node{
 
         
         // Define the small UAV-fixed wing autopilot model:
-         Eigen::VectorXd FixedWingLogic(const Eigen::VectorXd &state, double vel_cmd, double course_cmd, double alt_cmd){
+        Eigen::VectorXd FixedWingLogic(const Eigen::VectorXd &state, double vel_cmd, double course_cmd, double alt_cmd){
             // Define the constant values
             const double g = 9.81;   // gravity
             const double kp_V = 6.7; // proportional gain of the velocity
