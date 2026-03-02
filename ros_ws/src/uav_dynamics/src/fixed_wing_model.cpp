@@ -58,8 +58,9 @@ class FixedWingDynamics : public rclcpp::Node{
                     avoider_topic, qos, std::bind(&FixedWingDynamics::avoider_states_callback, this, std::placeholders::_1));
                 
                 // SUbscribe to the mission start to start all tehe avoidance:
+                auto qos_miss = rclcpp::QoS(rclcpp::KeepLast(1)).reliability(rclcpp::ReliabilityPolicy::Reliable).durability(rclcpp::DurabilityPolicy::TransientLocal);
                 mission_start_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-                    mission_start_topc, qos, std::bind(&FixedWingDynamics::mission_start_callback, this, std::placeholders::_1)
+                    mission_start_topc, qos_miss, std::bind(&FixedWingDynamics::mission_start_callback, this, std::placeholders::_1)
                 );
                 
                 // Subscribe to the obstacles states:
@@ -493,7 +494,7 @@ int main(int argc, char **argv){
     rclcpp::init(argc, argv);
 
     // Safety check that all the arguments are being inputted:
-    if (argc < 6)
+    if (argc < 5)
     {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), 
                      "Usage: ros2 run <package_name> <executable_name> <avoider_name> <waypoints_string> <guidance_system> <active_avoidance (0 or 1)>");

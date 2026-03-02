@@ -9,48 +9,53 @@
     <xacro:macro name="vtol_sim" params="robot_name camera_num robot_scale world_name initial_alt">
         
         <!-- Add the frontal camera sensor -->
-        <gazebo reference="frontal_camera_link">
-            <sensor name="frontal_camera" type="camera">
-                <always_on>true</always_on>
-                <update_rate>30</update_rate>
-                <visualize>true</visualize>
-                <camera>
-                    <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
-                    <image>
-                        <width>${(2832 * camera_num)}</width>
-                        <height>2360</height>
-                        <format>R8G8B8</format>
-                    </image>
-                    <clip>
-                        <near>0.1</near>
-                        <far>2000</far>
-                    </clip>
-                </camera>
-            </sensor>
-        </gazebo>
+        <xacro:if value="${float($(arg camera_num)) > 0.0}">
+            <gazebo reference="frontal_camera_link">
+                <sensor name="frontal_camera" type="camera">
+                    <always_on>true</always_on>
+                    <update_rate>30</update_rate>
+                    <visualize>true</visualize>
+                    <camera>
+                        <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
+                        <image>
+                            <width>${(2832 * camera_num)}</width>
+                            <height>2360</height>
+                            <format>R8G8B8</format>
+                        </image>
+                        <clip>
+                            <near>0.1</near>
+                            <far>2000</far>
+                        </clip>
+                    </camera>
+                </sensor>
+            </gazebo>
+        </xacro:if>
 
 
 
         <!-- Add a camera to follow the Airplane -->
-        <gazebo reference="follow_camera_link">
-            <sensor name="follow_camera" type="camera">
-                <always_on>true</always_on>
-                <update_rate>30</update_rate>
-                <visualize>true</visualize>
-                <camera>
-                    <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
-                    <image>
-                        <width>${(3210 * camera_num)}</width>
-                        <height>2360</height>
-                        <format>R8G8B8</format>
-                    </image>
-                    <clip>
-                        <near>0.1</near>
-                        <far>2000</far>
-                    </clip>
-                </camera>
-            </sensor>
-        </gazebo>
+        <xacro:if value="${float($(arg camera_num)) > 0.0}">
+            <gazebo reference="follow_camera_link">
+                <sensor name="follow_camera" type="camera">
+                    <always_on>true</always_on>
+                    <update_rate>30</update_rate>
+                    <visualize>true</visualize>
+                    <camera>
+                        <horizontal_fov>${(camera_num * 1.256637)}</horizontal_fov>
+                        <image>
+                            <width>${(3210 * camera_num)}</width>
+                            <height>2360</height>
+                            <format>R8G8B8</format>
+                        </image>
+                        <clip>
+                            <near>0.1</near>
+                            <far>2000</far>
+                        </clip>
+                    </camera>
+                </sensor>
+            </gazebo>
+        </xacro:if>
+
 
 
 

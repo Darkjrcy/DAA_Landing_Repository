@@ -51,9 +51,9 @@ endif()
 # Install the launch folders and the models inside the 
 install(
   DIRECTORY
-    launch
-    worlds
-    models
+  launch
+  worlds
+  models
   DESTINATION share/${PROJECT_NAME}/
 )
 

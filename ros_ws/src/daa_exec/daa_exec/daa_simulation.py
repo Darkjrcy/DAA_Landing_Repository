@@ -129,7 +129,7 @@ class DAASimulation(Node):
         self.save_dir = self.get_parameter('data_directory').value
 
         # Declare the world name:
-        self.declare_parameter('world_name')
+        self.declare_parameter('world_name', 'ERAU')
         self.world_name = self.get_parameter('world_name').value
 
         # Define the plot characteristics:
@@ -149,7 +149,7 @@ class DAASimulation(Node):
         self.declare_parameter('avoidance_types', ['GEOMETRIC', 'NO'])
         # Save the values:
         self.model_names = self.get_parameter('model_names').value
-        uav_type = self.declare_parameter('uav_type').value
+        uav_type = self.get_parameter('uav_type').value
         model_wp_raw = self.get_parameter('model_waypoints').value
         has_avoidance = self.get_parameter('has_avoidance').value
         avoidance_types = self.get_parameter('avoidance_types').value
@@ -255,7 +255,10 @@ class DAASimulation(Node):
 
         
         # Create a publisher to the start_mission topic:
-        self.start_mission_pub = self.create_publisher(Bool, "/mission_starts", 1)
+        q_miss = QoSProfile(depth=1)
+        q_miss.reliability = ReliabilityPolicy.RELIABLE
+        q_miss.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self.start_mission_pub = self.create_publisher(Bool, "/mission_starts", q_miss)
 
         # QoS for the publishers
         qos_2 = QoSProfile(depth=1)
@@ -349,7 +352,7 @@ class DAASimulation(Node):
         # PLot the Intruders trajecotories:
         for name, segments in self.intruders_info.items():
             # Open the respective trajctory:
-            intr_traejct = segments[name]
+            intr_traejct = segments[num_encounter]
             intr_e_ft = intr_traejct[: , 1] / 0.3048
             intr_n_ft = intr_traejct[: , 0] / 0.3048
             intr_u_ft = intr_traejct[: , 2] / 0.3048
@@ -425,10 +428,10 @@ class DAASimulation(Node):
 
 
     # Detect when the Airplane its near the goal position:
-    def traj_complete_callback(self,msg, name):
+    def traj_complete_callback(self,msg):
         if msg.data and not getattr(self, "traj_complete", False):
             self.traj_complete = True
-            self.get_logger().info(f"{name} completed the trajectory; signaling encounter completion")
+            self.get_logger().info(f" Completed the trajectory; signaling encounter completion")
     
 
 
@@ -536,7 +539,7 @@ class DAASimulation(Node):
                     continue
 
                 # Add ADS-B messages to the Avoidance publisher:
-                intr_states = AdsbInfo
+                intr_states = AdsbInfo()
                 # Position:
                 intr_states.north = self.models_adsb_north[model_name_i][-1]
                 intr_states.east = self.models_adsb_east[model_name_i][-1]
