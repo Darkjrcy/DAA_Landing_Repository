@@ -129,6 +129,9 @@ class FixedWingDynamics : public rclcpp::Node{
         std::optional<Eigen::Vector3d> avoidance_last_point_enu;
         // ENd of avoidance arc made for avoidance:
         std::optional<size_t> end_of_arc_ = 0; 
+        // UAV chracteristics
+        double min_radius_;
+        double max_roll_ = 35.0/57.3;
         // FGAC characteristics:
         struct GeometricAvoidanceVars {
             double min_radius;
@@ -272,7 +275,7 @@ class FixedWingDynamics : public rclcpp::Node{
             // Obtain the commanded roll:
             double roll_cmd = atan2(kp_heading * angdiff(course_cmd,state(3)) * V, g);
             // Limit the commanded roll:
-            roll_cmd = std::clamp(roll_cmd, -35.0/57.3, 35.0/57.3);
+            roll_cmd = std::clamp(roll_cmd, -max_roll_, max_roll_);
 
             // Obtian the FPA command:
             double alt_diff = kp_h * (alt_cmd - state(2));
@@ -354,7 +357,12 @@ class FixedWingDynamics : public rclcpp::Node{
 
             // Identify if the avoidance maneuver is compelted and restard the following varibales in case is required:
             if (active_avoidance_){
+                // Calculate the minimum radius using the UAV characteristisc:
+                min_radius_ = velocity_a * velocity_a * std::tan(max_roll_) / 9.81;
+
                 if (guidance_system_ == "GEOMETRIC"){
+                    // Add the minimum raduis to the avodance parameters.
+                    avoidance_vars_geom_->min_radius = min_radius_;
                     if (start_the_avoidance) {
                         const Eigen::Vector3d avoidance_last_point_ned = ENU_to_NED(avoidance_last_point_enu.value()); // (N,E,-U)
 
