@@ -11,4 +11,4 @@ ros_ws/log/*
 
 # Ignore compiled MATLAB object files
 *.o
-ros_ws/src/uav_dynamics/src/matlab_obj/
+ros_ws/src/uav_dynamics/src/matlab_obj/*
