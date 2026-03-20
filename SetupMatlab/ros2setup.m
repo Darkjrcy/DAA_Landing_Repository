@@ -1,0 +1,29 @@
+function ros2setup(src_path)
+    % The src_path is the directory to your src foler inside your ros_ws:
+    % Example: "/home/.../.../.../.../ros_ws/src"
+    % Define the folder wher the message should be generated:
+    genFolderPath = fullfile(src_path, 'matlab_msg_gen');
+    
+    % Check if the messages are already generated, 
+    % and generate them only if they are got generated already:
+    allMsgs = ros2('msg', 'list');
+    if ~any(contains(allMsgs, '"uav_dynamics/AvoidanceStates"'))
+        ros2genmsg(src_path);
+
+        % Create a gitignore file so it doesn't afffect your packages:
+        ignoreFilePath = fullfile(genFolderPath, '.colconignore');
+        fid = fopen(ignoreFilePath, 'w');
+        if fid ~= -1
+            fclose(fid);
+            fprintf('Created .colconignore to protect your ROS 2 workspace.\n');
+        else
+            warning('Could not create .colconignore file.');
+        end
+
+    end
+
+    % Add the folder to the MATLAB path in case you didn't genrate the msg:
+    if exist(genFolderPath, 'dir')
+        addpath(genFolderPath);
+    end
+end

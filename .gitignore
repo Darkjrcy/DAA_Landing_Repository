@@ -9,6 +9,9 @@ ros_ws/build/*
 ros_ws/install/*
 ros_ws/log/*
 
+# Ignore teh package created by matlab msg:
+ros_ws/src/matlab_msg_gen/*
+
 # Ignore compiled MATLAB object files
 *.o
 ros_ws/src/uav_dynamics/src/matlab_obj/*
