@@ -9,7 +9,7 @@
 
 // ROS 2 Messages needed for the inputs
 #include "uav_dynamics/msg/avoidance_states.hpp"
-#include "gnss_multipath_plugin/msg/adsb_info.hpp"
+#include "gnss_multipath_plugin/msg/states_info.hpp"
 
 // Structure that contains all the varibale required to change inside the Geomtric DAA
 struct NavigationState {
@@ -24,7 +24,7 @@ struct NavigationState {
 };
 
 // Declare the main geometric DAA fucntion
-void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacles, const gnss_multipath_plugin::msg::AdsbInfo& own_state, 
+void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacles, const gnss_multipath_plugin::msg::StatesInfo& own_state, 
     double min_radius,  double crit_time, NavigationState& nav_state);
 
 #endif // GEOMETRIC_GUIDANCE_HPP

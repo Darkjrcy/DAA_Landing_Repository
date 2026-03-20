@@ -3,7 +3,7 @@
 // Include ROS2 message:
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/bool.hpp>
-#include "gnss_multipath_plugin/msg/adsb_info.hpp"
+#include "gnss_multipath_plugin/msg/states_info.hpp"
 #include "rosgraph_msgs/msg/clock.hpp"
 // C++ libraries:
 #include <iostream>
@@ -104,9 +104,9 @@ class SaveUAVInfo : public rclcpp::Node{
                 );
 
                 // Create the ADS-B subscribers
-                adsb_subs_[name] = this->create_subscription<gnss_multipath_plugin::msg::AdsbInfo>(
+                adsb_subs_[name] = this->create_subscription<gnss_multipath_plugin::msg::StatesInfo>(
                     adsb_info_topic, 10,
-                    [this, name](const gnss_multipath_plugin::msg::AdsbInfo::SharedPtr msg) {
+                    [this, name](const gnss_multipath_plugin::msg::StatesInfo::SharedPtr msg) {
                         std::lock_guard<std::mutex> lock(mutex_);
                         last_adsb_states_[name] = *msg;
                     }
@@ -141,7 +141,7 @@ class SaveUAVInfo : public rclcpp::Node{
         // Last sates of the UAVs:
         std::map<std::string, std::optional<nav_msgs::msg::Odometry>> last_uav_states_;
         // Last ADS-Bs states:
-        std::map<std::string, std::optional<gnss_multipath_plugin::msg::AdsbInfo>> last_adsb_states_;
+        std::map<std::string, std::optional<gnss_multipath_plugin::msg::StatesInfo>> last_adsb_states_;
 
         // Maps to hold the historical data for each UAV
         std::map<std::string, std::vector<Odom_unit>> odom_histories_;
@@ -150,7 +150,7 @@ class SaveUAVInfo : public rclcpp::Node{
 
         // Define the subscribers in ROS2:
         std::map<std::string, rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> states_subs_;
-        std::map<std::string, rclcpp::Subscription<gnss_multipath_plugin::msg::AdsbInfo>::SharedPtr> adsb_subs_;
+        std::map<std::string, rclcpp::Subscription<gnss_multipath_plugin::msg::StatesInfo>::SharedPtr> adsb_subs_;
         rclcpp::Subscription<rosgraph_msgs::msg::Clock>::SharedPtr clock_cub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr start_recording_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr trajectory_complete_sub_;

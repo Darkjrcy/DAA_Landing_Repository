@@ -223,6 +223,16 @@ def launch(context, *args, **kwargs):
     )
     launch_process.append(launch_daa_sim)
 
+    # Add the stop simulation node to stop evrything when the trejctories are completed:
+    stop_sim = Node(
+        package=pkg_daa_sim,
+        executable='stop_simulation',
+        name= 'stop_simulation',
+        output = 'screen',
+    )
+    launch_process.append(stop_sim)
+
+
 
 
     # Return all the launch processes;

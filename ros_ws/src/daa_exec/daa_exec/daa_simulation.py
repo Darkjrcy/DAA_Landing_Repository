@@ -22,9 +22,11 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 # Messages required:
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist
-from gnss_multipath_plugin.msg import AdsbInfo
+from gnss_multipath_plugin.msg import StatesInfo, AdsbInfo
 from uav_dynamics.msg import AvoidanceStates
 from nav_msgs.msg import Odometry
+# Service to restart teh ADS-B info:
+from std_srvs.srv import Trigger
 
 # Libraries to start other executables on the command window:
 import subprocess
@@ -206,6 +208,8 @@ class DAASimulation(Node):
         # Create subscribers to the states and ads-b of each model:
         self.models_states_subs = []
         self.models_adsb_subs = []
+        # Disctiory to hold the clients to restart teh ASD-B information:
+        self.restart_adsb_clients = {}
         # Create dictionaries to save the real position of the models to be plotted:
         self.models_states_north_ft = {}
         self.models_states_east_ft = {}
@@ -225,38 +229,44 @@ class DAASimulation(Node):
         self.models_adsb_r = {}
         # Forloop in all the models:
         for i in range(len(self.model_names)):
+            # MOdel:
+            model_name = self.model_names[i]
             # Subscribe to the states to generate the plots of the trajectories:
             state_sub = self.create_subscription(
-                Odometry, f"/{self.model_names[i]}/states", 
-                lambda msg, n=self.model_names[i]: self.states_callback(msg,n),
+                Odometry, f"/{model_name}/states", 
+                lambda msg, n=model_name: self.states_callback(msg,n),
                 q_reliable
             )
             self.models_states_subs.append(state_sub)
+            # Create clients for the ADS-B restart every time a waypoint is restarted:
+            self.restart_adsb_clients[model_name] = self.create_client(
+                Trigger, 
+                f"/{model_name}/restart_adsb"
+            )
             # Create vectors to save the position that later is going to be plot:
-            self.models_states_north_ft[self.model_names[i]] = []
-            self.models_states_east_ft[self.model_names[i]] = []
-            self.models_states_up_ft[self.model_names[i]] = []
-
+            self.models_states_north_ft[model_name] = []
+            self.models_states_east_ft[model_name] = []
+            self.models_states_up_ft[model_name] = []
             # Subscribe to the adsb information to publish to the DAA algorithms:
             adsb_sub = self.create_subscription(
-                AdsbInfo, f"/{self.model_names[i]}/adsb_info",
-                lambda msg, n=self.model_names[i]: self.adsb_callback(msg,n),
+                StatesInfo, f"/{model_name}/adsb_info",
+                lambda msg, n=model_name: self.adsb_callback(msg,n),
                 q_reliable
             )
             self.models_adsb_subs.append(adsb_sub)
             # Create lits to save the states give by hte ADS-B:
-            self.models_adsb_north[self.model_names[i]] = []
-            self.models_adsb_east[self.model_names[i]] = []
-            self.models_adsb_up[self.model_names[i]] = []
-            self.models_adsb_v_north[self.model_names[i]] = []
-            self.models_adsb_v_east[self.model_names[i]] = []
-            self.models_adsb_v_up[self.model_names[i]] = []
-            self.models_adsb_course[self.model_names[i]] = []
-            self.models_adsb_fpa[self.model_names[i]] = []
-            self.models_adsb_roll[self.model_names[i]] = []
-            self.models_adsb_p[self.model_names[i]] = []
-            self.models_adsb_q[self.model_names[i]] = []
-            self.models_adsb_r[self.model_names[i]] = []
+            self.models_adsb_north[model_name] = []
+            self.models_adsb_east[model_name] = []
+            self.models_adsb_up[model_name] = []
+            self.models_adsb_v_north[model_name] = []
+            self.models_adsb_v_east[model_name] = []
+            self.models_adsb_v_up[model_name] = []
+            self.models_adsb_course[model_name] = []
+            self.models_adsb_fpa[model_name] = []
+            self.models_adsb_roll[model_name] = []
+            self.models_adsb_p[model_name] = []
+            self.models_adsb_q[model_name] = []
+            self.models_adsb_r[model_name] = []
 
         
         # Create a publisher to the start_mission topic:
@@ -312,7 +322,9 @@ class DAASimulation(Node):
         except Exception:
             pass
         with contextlib.suppress(Exception):
-            self.stop_pub.publish(Bool(data=True))
+            msg = Bool()
+            msg.data = True
+            self.stop_pub.publish(msg)
         
         # Try it first easily and later harder:
         self.stop_wait_the_followers(grace1=1.5, grace2=1.5)
@@ -574,39 +586,94 @@ class DAASimulation(Node):
     
     # Keep the system running while the followers are closing:
     def stop_wait_the_followers(self, grace1: float = 6.0, grace2: float = 5.0):
-        if not self.running_procs:
+        # Define all process:
+        all_procs = {**self.running_procs, **getattr(self, 'save_info_procs', {})}
+        if not all_procs:
             return
+        
+        # Helper function to make ROS sleep if nodes are estroyed:
+        def safe_sleep(duration):
+            try:
+                rclpy.spin_once(self, timeout_sec=duration)
+            except Exception:
+                time.sleep(duration)
         
         # Give them time to close by themselves:
         t_end = time.time() + grace1
         while time.time() < t_end:
-            if all(p.poll() is not None for p in self.running_procs.values()):
+            if all(p.poll() is not None for p in all_procs.values()):
                 break
-            rclpy.spin_once(self, timeout_sec=0.1)
+            safe_sleep(0.1)
 
-        # Stop any remainning process that is still open;
-        still_alive = [p for p in self.running_procs.values() if p.poll() is None]
-        for p in still_alive:
-            try:
-                os.killpg(os.getpgid(p.pid), signal.SIGINT)
-            except Exception:
-                p.terminate()
+        # Stop any remaining processes that are still open (SIGINT):
+        for name, p in list(all_procs.items()):
+            if p.poll() is None:
+                try:
+                    os.killpg(os.getpgid(p.pid), signal.SIGINT)
+                except Exception:
+                    try:
+                        p.terminate()
+                    except Exception:
+                        pass
             
-        # Wait a bit more of time
+        # Wait a bit more time for graceful shutdown
         t_end = time.time() + grace2
         while time.time() < t_end:
-            if all(p.poll() is not None for p in self.running_procs.values()):
+            if all(p.poll() is not None for p in all_procs.values()):
                 break
-            rclpy.spin_once(self, timeout_sec=0.1)
+            safe_sleep(0.1)
         
-        # Hard kill the stragglers:
-        for name, p in list(self.running_procs.items()):
+        # Hard kill the stragglers (SIGKILL) and reap them:
+        for name, p in list(all_procs.items()):
             if p.poll() is None:
                 try:
                     os.killpg(os.getpgid(p.pid), signal.SIGKILL)
                 except Exception:
-                    p.kill()
-            self.running_procs.pop(name, None)
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+            
+            # CRITICAL: Read the exit status so Linux doesn't leave it as a "defunct" zombie process
+            try:
+                p.wait(timeout=1.0)
+            except Exception:
+                pass
+                
+        # Clear the original dictionaries safely
+        self.running_procs.clear()
+        if hasattr(self, 'save_info_procs'):
+            self.save_info_procs.clear()
+    
+
+
+    # Function to restart teh ADS-B services of the UAVs:
+    def restart_all_adsb(self):
+        # Trigger each service from the UAV list:
+        for model_name in self.model_names:
+            # Create the client:
+            client = self.restart_adsb_clients[model_name]
+
+            # Create the trigger request:
+            req = Trigger.Request()
+            future = client.call_async(req)
+            # Attach a callback to handle the response so we don't block the execution
+            future.add_done_callback(
+                lambda fut, n=model_name: self._restart_adsb_response_callback(fut, n)
+            )
+
+    
+
+    # FUnction to handle the respond of the request to restar the ASD-B transmitter:
+    def _restart_adsb_response_callback(self, future, model_name):
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(f"[{model_name}] ADS-B restarted successfully: {response.message}")
+            else:
+                self.get_logger().warn(f"[{model_name}] Failed to restart ADS-B: {response.message}")
+        except Exception as e:
+            self.get_logger().error(f"[{model_name}] Service call failed with exception: {e}")
     
 
 
@@ -717,6 +784,9 @@ class DAASimulation(Node):
             # Spawn the intruders:
             for name, segments in self.intruders_info.items():
                 self.spawn_the_UAV_using_waypoints(name, segments[i])
+
+            # Restart the ADS0B transmitter:
+            self.restart_all_adsb()
             
             # Launch the uav dynamics process:
             self.start_uav_dynamics(i)

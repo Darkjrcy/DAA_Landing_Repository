@@ -410,7 +410,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
 
 // RElaize the Geomtric AVoidance algorithm:
-void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacles, const gnss_multipath_plugin::msg::AdsbInfo& own_state,
+void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacles, const gnss_multipath_plugin::msg::StatesInfo& own_state,
     double min_radius, double crit_time, NavigationState& nav_state){
         // Get the ownship data:
         const double own_e  = own_state.east;

@@ -12,7 +12,7 @@
 #include <Eigen/Dense> 
 // ROS2 Messages:
 #include "uav_dynamics/msg/avoidance_states.hpp"
-#include "gnss_multipath_plugin/msg/adsb_info.hpp"
+#include "gnss_multipath_plugin/msg/states_info.hpp"
 #include <geometry_msgs/msg/twist.hpp>
 #include <std_msgs/msg/bool.hpp>
 // Add the library 
@@ -54,7 +54,7 @@ class FixedWingDynamics : public rclcpp::Node{
                 }
 
                 // Subscriber to the states of the avoider:
-                avoider_states_sub_ = this->create_subscription<gnss_multipath_plugin::msg::AdsbInfo>(
+                avoider_states_sub_ = this->create_subscription<gnss_multipath_plugin::msg::StatesInfo>(
                     avoider_topic, qos, std::bind(&FixedWingDynamics::avoider_states_callback, this, std::placeholders::_1));
                 
                 // SUbscribe to the mission start to start all tehe avoidance:
@@ -100,7 +100,7 @@ class FixedWingDynamics : public rclcpp::Node{
         double look_ahead_distance_ = 250;
 
         // Define the avoider current state:
-        gnss_multipath_plugin::msg::AdsbInfo avoider_current_state_;
+        gnss_multipath_plugin::msg::StatesInfo avoider_current_state_;
 
         // Re-initialize the waypoint index changing the MIT encounter set:
         size_t current_idx = 0;
@@ -111,7 +111,7 @@ class FixedWingDynamics : public rclcpp::Node{
         bool start_following = false;
 
         // Deifine the ROS2 subscribers and publishers:
-        rclcpp::Subscription<gnss_multipath_plugin::msg::AdsbInfo>::SharedPtr avoider_states_sub_;
+        rclcpp::Subscription<gnss_multipath_plugin::msg::StatesInfo>::SharedPtr avoider_states_sub_;
         rclcpp::Subscription<uav_dynamics::msg::AvoidanceStates>::SharedPtr obstacles_states_sub_;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr complete_encounter_pub_;
@@ -304,7 +304,7 @@ class FixedWingDynamics : public rclcpp::Node{
 
 
         // Avoider ads-b message callback:
-        void avoider_states_callback(const gnss_multipath_plugin::msg::AdsbInfo::SharedPtr msg){
+        void avoider_states_callback(const gnss_multipath_plugin::msg::StatesInfo::SharedPtr msg){
             // Save the actual avoider state:
             avoider_current_state_ = *msg;
 
