@@ -24,6 +24,28 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 # Add the include directory:
 include_directories(include)
+# Add this to enable M_PI support in math.h/cmath
+add_definitions(-D_USE_MATH_DEFINES)
+
+
+
+# # Create a static library to see if the dubins systems compiles correctly;
+# add_library(dubins_lib STATIC 
+#     src/uav_dubins_paths.cpp
+# )
+
+# file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/dummy_main.cpp "int main() { return 0; }")
+# add_executable(build_check ${CMAKE_CURRENT_BINARY_DIR}/dummy_main.cpp)
+
+# # Link-Check with the MATLAB .o files
+# target_link_libraries(build_check 
+#     dubins_lib
+#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection.o
+#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection_api.o
+#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/autonomouscodegen_dubins.o  
+# )
+
+
 
 # Install the Fixed wiing guidance logic:
 # COmpile both the Geometric_guidance and the fixed_wing model executbales:
@@ -48,6 +70,7 @@ target_link_libraries(fixed_wing_dynamics_node Eigen3::Eigen)
 install(TARGETS fixed_wing_dynamics_node
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 
 

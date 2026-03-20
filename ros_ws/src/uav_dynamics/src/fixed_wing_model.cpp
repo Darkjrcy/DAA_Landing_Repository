@@ -358,7 +358,7 @@ class FixedWingDynamics : public rclcpp::Node{
             // Identify if the avoidance maneuver is compelted and restard the following varibales in case is required:
             if (active_avoidance_){
                 // Calculate the minimum radius using the UAV characteristisc:
-                min_radius_ = velocity_a * velocity_a * std::tan(max_roll_) / 9.81;
+                min_radius_ = velocity_a * velocity_a / (std::tan(max_roll_)  * 9.81);
 
                 if (guidance_system_ == "GEOMETRIC"){
                     // Add the minimum raduis to the avodance parameters.

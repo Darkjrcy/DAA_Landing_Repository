@@ -253,7 +253,7 @@
         
         <!-- Fixed joint to dummy link -->
         <joint name="vtol_joint" type="fixed">
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.5708"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="base_link"/>
             <child link="vtol_body"/>
         </joint>

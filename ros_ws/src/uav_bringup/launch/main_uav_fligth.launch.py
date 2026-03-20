@@ -101,7 +101,12 @@ def launch(context, *args, **kwargs):
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################
-    MAIN_DIR = "/home/jorge/DAA_Landing_Repository/ros_ws/src/uav_bringup/saving_data"
+    # Deifne the isntallation directory:
+    install_dir = get_package_share_directory(pkg_bringup)
+    # Root:
+    ws_root = os.path.abspath(os.path.join(install_dir, '../../../../'))
+    # Deifne the main directory:
+    MAIN_DIR = os.path.join(ws_root, 'src', pkg_bringup, 'saving_data')
     # Create a new fodler every time is launched:
     tests = [f for f in os.listdir(MAIN_DIR) if os.path.isdir(os.path.join(MAIN_DIR,f))]
     # Add a new folder:

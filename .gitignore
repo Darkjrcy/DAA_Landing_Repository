@@ -1,8 +1,14 @@
 # Ignore all the subdirectories inside the models folder:
 ros_ws/src/uav_bringup/models/*
 
+# Ignore the files that have been saved form the lfights:
+ros_ws/src/uav_bringup/saving_data/*
+
 # Ignore the installation folders that are created from the installation:
 ros_ws/build/*
 ros_ws/install/*
 ros_ws/log/*
 
+# Ignore compiled MATLAB object files
+*.o
+ros_ws/src/uav_dynamics/src/matlab_obj/

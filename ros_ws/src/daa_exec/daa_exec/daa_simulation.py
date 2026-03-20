@@ -154,6 +154,9 @@ class DAASimulation(Node):
         has_avoidance = self.get_parameter('has_avoidance').value
         avoidance_types = self.get_parameter('avoidance_types').value
 
+        # Identify if one of the avoiders is a VTOL:
+        self.is_a_vtol = False
+
         # Define vectors to save the avoiders and the intruders:
         # AVoiders:
         self.avoiders_info_string = {}
@@ -170,6 +173,8 @@ class DAASimulation(Node):
                 self.avoiders_info_string[self.model_names[i]] = separate_wp(model_wp_raw[i])
                 self.avoiders_info[self.model_names[i]] = parse_multiple_wp_strings(model_wp_raw[i])
                 self.avoiders_type[self.model_names[i]] = avoidance_types[i]
+                if uav_type[i] == "vtol":
+                    self.is_a_vtol = True
             else:
                 self.intruders_info_string[self.model_names[i]] = separate_wp(model_wp_raw[i])
                 self.intruders_info[self.model_names[i]] = parse_multiple_wp_strings(model_wp_raw[i])
@@ -411,7 +416,7 @@ class DAASimulation(Node):
             self.models_adsb_v_up,
             self.models_adsb_course,
             self.models_adsb_fpa,
-            self.models_adsb_roll
+            self.models_adsb_roll,
         ]
 
         # Erase the running process of ROS2 that need to be closed:
@@ -609,11 +614,13 @@ class DAASimulation(Node):
     def start_uav_dynamics(self, idx):
         # For every uav launch the model for avoiders:
         for name, seg_list in self.avoiders_info_string.items():
-            own_args = [
-                "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], self.avoiders_type[name], "1" 
-            ]
-            # Add it to the running process:
-            self.running_procs[name] = subprocess.Popen(own_args, start_new_session=True)
+            # Remember if its a vtol it woudl run the dynamics in MATLAB, so you don't need to open them:
+            if not self.is_a_vtol:
+                own_args = [
+                    "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], self.avoiders_type[name], "1" 
+                ]
+                # Add it to the running process:
+                self.running_procs[name] = subprocess.Popen(own_args, start_new_session=True)
         # Now fo it for every intruder:
         for name, seg_list in self.intruders_info_string.items():
             intr_args = [
@@ -628,12 +635,14 @@ class DAASimulation(Node):
     def start_the_mission(self):
         # Check if hte mission has already started from anoehr funciton:
         if not self.mission_started:
-            # Now started yourself:
-            self.mission_started = True
-            # Punlish it so all the other nodes see the message:
-            msg = Bool()
-            msg.data = True
-            self.start_mission_pub.publish(msg)
+            # Start the mission from the exeutbale only if hte vtol is not openned in MATLAB:
+            if not self.is_a_vtol:
+                # Now started yourself:
+                self.mission_started = True
+                # Punlish it so all the other nodes see the message:
+                msg = Bool()
+                msg.data = True
+                self.start_mission_pub.publish(msg)
 
 
 
@@ -758,7 +767,6 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
 
 
 

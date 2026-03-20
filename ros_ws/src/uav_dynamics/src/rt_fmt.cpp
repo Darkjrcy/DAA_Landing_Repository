@@ -1,4 +1,5 @@
 #include "uav_dynamics/rt_fmt.hpp"
+#include "uav_dynamics/uav_dubins_paths.hpp"
 #include <iostream>
 #include <vector>
 #include <cmath>
