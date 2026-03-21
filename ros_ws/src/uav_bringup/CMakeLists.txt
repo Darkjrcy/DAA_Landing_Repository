@@ -54,6 +54,7 @@ install(
   launch
   worlds
   models
+  config
   DESTINATION share/${PROJECT_NAME}/
 )
 

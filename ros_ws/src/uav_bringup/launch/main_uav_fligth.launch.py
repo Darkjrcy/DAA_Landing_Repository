@@ -63,7 +63,7 @@ def launch(context, *args, **kwargs):
 
     # Launch Arguments for Spawning:
     # Type of the UAVs (fixed_wing, vtol):
-    type_uav = ["fixed_wing", "fixed_wing", "fixed_wing"]
+    type_uav = ["vtol", "fixed_wing", "fixed_wing"]
     # Launch airplane arguments:
     robot_names = ["airplane_1", "airplane_2", "airplane_3"]
     # Create the spawning positions randomlly:

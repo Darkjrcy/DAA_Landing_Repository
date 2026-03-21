@@ -780,6 +780,8 @@ class DAASimulation(Node):
 
             # Spawn the avoiders:
             for name, segments in self.avoiders_info.items():
+                if self.uav_type[name] == "vtol":
+                    continue
                 self.spawn_the_UAV_using_waypoints(name, segments[i])
             # Spawn the intruders:
             for name, segments in self.intruders_info.items():

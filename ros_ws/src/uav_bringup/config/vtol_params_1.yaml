@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    east0: 100.000000
+    north0: 100.000000
+    alt0: 50.000000
+    heading: 0.785398
+    fpa: 0.349040
+    roll: 0.174520
