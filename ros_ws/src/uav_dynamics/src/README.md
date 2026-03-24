@@ -9,7 +9,7 @@ To keep the repository lightweight and prevent cross-platform compilation errors
 * MATLAB UAV Toolbox
 * MATLAB Coder (for generating C/C++ code and object files)
 
-##\ How to Generate the `.o` Files
+### How to Generate the object MATLAB`.o` Files
 
 1. Open MATLAB and navigate to the directory containing your UAV dynamics/Dubins path MATLAB scripts. Create a fucntion that uses the `uavDubinsConnection()` for example:
 ``` matlab 
