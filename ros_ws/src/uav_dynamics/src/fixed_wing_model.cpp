@@ -377,6 +377,7 @@ class FixedWingDynamics : public rclcpp::Node{
                         }
                     }
                 }
+                // If you do the rt_fmt, please remember you need to add the heanding to the waypoints:
             }
 
             // Do stop system to stop if is near teh last waypoint:
