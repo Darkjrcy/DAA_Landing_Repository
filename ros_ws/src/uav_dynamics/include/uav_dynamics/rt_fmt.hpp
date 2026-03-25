@@ -76,6 +76,9 @@ struct  RTFMTPLannerState{
     std::deque<int> rewireRootList;
     std::pair<std::vector<int>, std::vector<Eigen::VectorXd>> Nz; // Neighbors of z
     std::vector<std::pair<int, int>> E;
+
+    // Unvisited cnadidate nodes of the trree:
+    std::vector<int> XNear;
 };
 
 
