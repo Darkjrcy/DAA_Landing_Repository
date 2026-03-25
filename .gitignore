@@ -15,3 +15,6 @@ ros_ws/src/matlab_msg_gen/*
 # Ignore compiled MATLAB object files
 *.o
 ros_ws/src/uav_dynamics/src/matlab_obj/*
+
+# Ignore the keys used for some creation:
+ros_ws/src/uav_bringup/config/world_creation.yaml

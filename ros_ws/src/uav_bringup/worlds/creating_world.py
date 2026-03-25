@@ -3,6 +3,8 @@ import math
 import os
 import time
 import urllib.request
+import mathutils
+import json
 from pathlib import Path
 
 # Define the folder path worlds and meshes
@@ -10,7 +12,16 @@ ACT_FOLDER     = Path(__file__).resolve().parent
 SRC_FOLDER     = ACT_FOLDER.parent.parent
 WORLDS_FOLDER  = (SRC_FOLDER / "uav_bringup" / "worlds") 
 MODELS_FOLDER  = (SRC_FOLDER / "uav_bringup" / "models") 
-MAPBOX_TOKEN   = ''  # ADD Mapbox token
+
+# Add your MAPBOX TOKEN FROM TEH CONFIG FOLDER you have to created!!!:
+mapbox_token_dir = (SRC_FOLDER / "uav_bringup" / "config" / "world_creation.yaml")
+if os.path.exists(mapbox_token_dir):
+    with open(mapbox_token_dir, 'r') as f:
+        for line in f:
+            if 'mapbox_token:' in line:
+                MAPBOX_TOKEN = line.split(':')[-1].strip().replace("'", "").replace('"', "")
+                break
+
 
 # Funtion to get ht eworld limits:
 def get_bounds(lat_cen, lon_cen, lat_mi, lon_mi):
@@ -35,20 +46,22 @@ def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-
 # DOwnload mapbox image:
-def download_mapbox_image(min_lat, max_lat, min_lon, max_lon, save_path):
-    lat_cen = (max_lat + min_lat) / 2
-    lon_diff = max_lon - min_lon
-    lat_diff = max_lat - min_lat
+def download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, save_path):
+    # Incrase the image by 50% as it tooks some houses that are near the limits:
+    lat_cen = (img_max_lat + img_min_lat) / 2
+    lon_diff = img_max_lon - img_min_lon
+    lat_diff = img_max_lat - img_min_lat
     aspect_ratio = (lon_diff * math.cos(math.radians(lat_cen))) / lat_diff
     
+    # Make the aspect ratio the best resulition
     if aspect_ratio >= 1:
-        w, h = 1200, int(1200 / aspect_ratio)
+        w, h = 1280, int(1280 / aspect_ratio)
     else:
-        w, h = int(1200 * aspect_ratio), 1200
+        w, h = int(1280 * aspect_ratio), 1280
         
-    url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/%5B{min_lon},{min_lat},{max_lon},{max_lat}%5D/{w}x{h}?access_token={MAPBOX_TOKEN}"
+    # DOwbnlaod the image from Mapbox:
+    url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/%5B{img_min_lon},{img_min_lat},{img_max_lon},{img_max_lat}%5D/{w}x{h}@2x?access_token={MAPBOX_TOKEN}"
     try:
         urllib.request.urlretrieve(url, save_path)
         print("Image Download Successful!")
@@ -88,14 +101,92 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
 
     # Set BLOSM preferences:
     prefs.osmDir = base_osm_path
+    prefs.mapboxAccessToken = MAPBOX_TOKEN
 
     blosm.minLat, blosm.maxLat = min_lat, max_lat
     blosm.minLon, blosm.maxLon = min_lon, max_lon
+    # Increase image size and terrain to handle structues outside fot eh limsits:
+    inc_perc = 0.5
+    lat_pad = (max_lat - min_lat) * inc_perc
+    lon_pad = (max_lon - min_lon) * inc_perc
+    img_min_lat = min_lat - lat_pad
+    img_max_lat = max_lat + lat_pad
+    img_min_lon = min_lon - lon_pad
+    img_max_lon = max_lon + lon_pad
+
+    # IMport the terrain from osm first:
+    blosm.minLat, blosm.maxLat = img_min_lat, img_max_lat
+    blosm.minLon, blosm.maxLon = img_min_lon, img_max_lon
+    blosm.dataType = 'terrain'
+    try:
+        bpy.ops.blosm.import_data()
+    except Exception as e:
+        print(f"Terrain import failed: {e}")
+
+    # Apply the texture and download it to terrain:
+    texture_path = os.path.join(str(models_path), "satellite.png")
+    if download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, texture_path):
+        print("Checking for texture file...")
+        timeout = 30
+        start_time = time.time()
+        while not os.path.exists(texture_path):
+            if time.time() - start_time > timeout:
+                print("ERROR: Texture download timed out!")
+                break
+            time.sleep(1)
+        img = bpy.data.images.load(texture_path)
+        img.pack()
+    else:
+        print("Failed to download texture.")
+        return
+
+    # Find the terrain object Blosm just created
+    terrain_obj = None
+    for obj in bpy.context.scene.objects:
+        if 'terrain' in obj.name.lower() and obj.type == 'MESH':
+            terrain_obj = obj
+            break
+
+    if terrain_obj:
+        terrain_obj.data.materials.clear() #
+        
+        mat = bpy.data.materials.new(name="TerrainMaterial")
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        
+        bsdf = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
+        tex_node = nodes.new('ShaderNodeTexImage')
+        tex_node.image = img
+        links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
+        
+        terrain_obj.data.materials.append(mat)
+
+        # Dynamic UV Projection based on the 3D mesh's actual world boundaries
+        if not terrain_obj.data.uv_layers:
+            terrain_obj.data.uv_layers.new(name="UVMap")
+            
+        matrix = terrain_obj.matrix_world
+        verts = terrain_obj.data.vertices
+        world_coords = [(matrix @ v.co) for v in verts]
+        
+        min_x, max_x = min(co.x for co in world_coords), max(co.x for co in world_coords)
+        min_y, max_y = min(co.y for co in world_coords), max(co.y for co in world_coords)
+        
+        for poly in terrain_obj.data.polygons:
+            for loop_index in poly.loop_indices:
+                v_idx = terrain_obj.data.loops[loop_index].vertex_index
+                co = matrix @ verts[v_idx].co 
+                u = (co.x - min_x) / (max_x - min_x)
+                v = (co.y - min_y) / (max_y - min_y)
+                terrain_obj.data.uv_layers.active.data[loop_index].uv = (u, v)
 
     # Import the 3D mesh
+    blosm.minLat, blosm.maxLat = min_lat, max_lat
+    blosm.minLon, blosm.maxLon = min_lon, max_lon
     blosm.dataType = 'osm'        
     blosm.buildings = True       
-    blosm.terrain = True
+    blosm.terrain = False
     for server in servers:
         prefs.overpassServer = server
         print(f"Trying Overpass server: {server}")
@@ -105,51 +196,54 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
         except Exception as e:
             print(f"Server {server} failed or timed out. Trying next...")
 
-    # Download the Image via Python 
-    texture_path = os.path.join(str(models_path), "satellite.png")
-    download_mapbox_image(min_lat, max_lat, min_lon, max_lon, texture_path)
+    # Clean all the extra things that are outside of the buildings:
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            name_lower = obj.name.lower()
+            # If it's not the terrain and not a building, delete it
+            if 'envelope' in name_lower:
+                bpy.data.objects.remove(obj, do_unlink=True)
+                continue
+            if 'terrain' not in name_lower and 'buildings' not in name_lower:
+                bpy.data.objects.remove(obj, do_unlink=True)
 
-    # Wait uintilt he image is downloaded:
-    print("Checking for texture file...")
-    timeout = 30
-    start_time = time.time()
-    while not os.path.exists(texture_path):
-        if time.time() - start_time > timeout:
-            print("ERROR: Texture download timed out!")
+    # To avoid gazebo to crate terrrains on the 10 mi over the level of the sea move the terrain to 
+    # sothe center altitude that you define:
+    terrain_obj = None
+    for obj in bpy.context.scene.objects:
+        if 'terrain' in obj.name.lower() and obj.type == 'MESH':
+            terrain_obj = obj
             break
-        time.sleep(1)
-        print("Waiting for file...")
-
-    # Create and project the UVs:
-    img = bpy.data.images.load(texture_path)
-    mat = bpy.data.materials.new(name="TerrainMaterial")
-    img.pack()
-    mat.use_nodes = True
-
-    # Setup Shader Nodes
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
-    tex_node = mat.node_tree.nodes.new('ShaderNodeTexImage')
-    tex_node.image = img
-    mat.node_tree.links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
-
-    # Apply to the Terrain Object
-    for obj in bpy.data.objects:
-        if "terrain" in obj.name.lower():
-            obj.data.materials.append(mat)
-            if not obj.data.uv_layers:
-                obj.data.uv_layers.new(name="UVMap")
+    
+    # FInd the lowest altitude
+    if terrain_obj:
+        matrix = terrain_obj.matrix_world
+        verts = terrain_obj.data.vertices
+        
+        # Find the vertex closest to X=0, Y=0
+        closest_z = 0.0
+        min_dist = float('inf')
+        
+        for v in verts:
+            world_co = matrix @ v.co
+            # Calculate distance from origin on the XY plane (Pythagorean theorem)
+            dist_to_center = (world_co.x ** 2) + (world_co.y ** 2)
             
-            verts = obj.data.vertices
-            min_x, max_x = min(v.co.x for v in verts), max(v.co.x for v in verts)
-            min_y, max_y = min(v.co.y for v in verts), max(v.co.y for v in verts)
-            
-            for poly in obj.data.polygons:
-                for loop_index in poly.loop_indices:
-                    v_idx = obj.data.loops[loop_index].vertex_index
-                    co = verts[v_idx].co
-                    u = (co.x - min_x) / (max_x - min_x)
-                    v = (co.y - min_y) / (max_y - min_y)
-                    obj.data.uv_layers.active.data[loop_index].uv = (u, v)
+            if dist_to_center < min_dist:
+                min_dist = dist_to_center
+                closest_z = world_co.z
+                
+        print(f"True altitude at (0,0) found: {closest_z} meters")
+
+        # Shift all root objects down by that exact Z amount
+        for obj in bpy.context.scene.objects:
+            if obj.parent is None:  
+                obj.location.z -= closest_z
+                
+        bpy.context.view_layer.update()
+        print("World successfully snapped to Z = 0.")
+    else:
+        print("WARNING: Terrain object not found for Z-axis normalization.")
 
     # Select all objects to export it:
     glb_file = os.path.join(str(models_path), f"{name}.glb")
@@ -351,5 +445,5 @@ generate_world_file(name, WORLDS_FOLDER)
 
 
 ################################# RUN CODE #################################
-# blender --background --python /home/jorge/DAA_Landing_Repository/ros_ws/src/uav_bringup/worlds/creating_world.py
+# blender --background --python ""
 ############################################################################

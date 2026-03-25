@@ -127,7 +127,7 @@ class DAASimulation(Node):
         super().__init__('daa_simulation')
 
         # Declare the directory where the information is going to be saved:\
-        self.declare_parameter('data_directory', '/home/adcl/AirplanePathFollower/DATA/DAA_Fligths') # Folder to save the inforamtion
+        self.declare_parameter('data_directory', '/DAA_FLights') # Folder to save the inforamtion
         self.save_dir = self.get_parameter('data_directory').value
 
         # Declare the world name:
