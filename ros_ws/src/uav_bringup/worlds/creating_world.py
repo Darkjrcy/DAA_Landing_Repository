@@ -3,6 +3,7 @@ import math
 import os
 import time
 import urllib.request
+import urllib.parse
 import mathutils
 import json
 from pathlib import Path
@@ -23,6 +24,7 @@ if os.path.exists(mapbox_token_dir):
                 break
 
 
+
 # Funtion to get ht eworld limits:
 def get_bounds(lat_cen, lon_cen, lat_mi, lon_mi):
     # Transofmration ratios:
@@ -41,10 +43,29 @@ def get_bounds(lat_cen, lon_cen, lat_mi, lon_mi):
     )
 
 
+
+# Function to ge the images from trees inside blender:
+def get_image_from_tree(nodes):
+    # First pass: check surface-level nodes
+    for n in nodes:
+        if n.type == 'TEX_IMAGE' and n.image:
+            return n.image
+    # Second pass: dig into Node Groups
+    for n in nodes:
+        if n.type == 'GROUP' and n.node_tree:
+            found_img = get_image_from_tree(n.node_tree.nodes)
+            if found_img:
+                return found_img
+    return None
+
+
+
 # Clear the main scene from the cube and the camera:
 def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
+
+
 
 # DOwnload mapbox image:
 def download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, save_path):
@@ -71,8 +92,34 @@ def download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, sa
         return False
 
 
+
+# Download osm file:
+def download_osm_file(min_lat, max_lat, min_lon, max_lon, save_path):
+    bbox = f"{min_lon},{min_lat},{max_lon},{max_lat}"
+    servers = [
+        f"https://overpass-api.de/api/map?bbox={bbox}",
+        f"https://lz4.overpass-api.de/api/map?bbox={bbox}",
+        f"https://overpass.kumi.systems/api/map?bbox={bbox}",
+        f"https://overpass.nchc.org.tw/api/map?bbox={bbox}"
+    ]
+    
+    # Try to use each server to download the osm file inthe models folder:
+    for url in servers:
+        print(f"Trying server: {url}")
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            # GIev a 5 miniutes limit to sownload the osm file:
+            with urllib.request.urlopen(req, timeout=300) as response, open(save_path, 'wb') as out_file:
+                out_file.write(response.read())
+            return True
+        except Exception as e:
+            time.sleep(2)
+    return False
+
+
+
 # Function to import the osm file of a lat, lon coordiantes:
-def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
+def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm_ver):
     # Create the models folder:
     if not os.path.exists(models_path):
         os.makedirs(models_path)
@@ -88,13 +135,6 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
     # Access blosm:
     scene = bpy.context.scene
     blosm = scene.blosm
-
-    # Lists of servers:
-    servers = [
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://overpass.nchc.org.tw/api/interpreter",
-        "https://lz4.overpass-api.de/api/interpreter"
-    ]
 
     # Access the addon preferences to change the server
     prefs = bpy.context.preferences.addons['blosm'].preferences
@@ -184,17 +224,42 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
     # Import the 3D mesh
     blosm.minLat, blosm.maxLat = min_lat, max_lat
     blosm.minLon, blosm.maxLon = min_lon, max_lon
-    blosm.dataType = 'osm'        
-    blosm.buildings = True       
+    blosm.dataType = 'osm'            
     blosm.terrain = False
-    for server in servers:
-        prefs.overpassServer = server
-        print(f"Trying Overpass server: {server}")
-        try:
-            bpy.ops.blosm.import_data()
-            break
-        except Exception as e:
-            print(f"Server {server} failed or timed out. Trying next...")
+
+
+    # IMport the building in case you are in the pro version:
+    if blosm_ver == "pro":
+        blosm.buildings = True  
+
+        # Force the 3D Realistic mode (handles roofs, complex geometry, and premium assets)
+        if hasattr(blosm, 'buildingsType'):
+            blosm.buildingsType = 'realistic'
+        elif hasattr(blosm, 'buildingMode'):
+            blosm.buildingMode = 'REALISTIC'
+            
+        # Ensure premium materials and roof generation are checked
+        if hasattr(blosm, 'defaultMaterials'):
+            blosm.defaultMaterials = True
+        if hasattr(blosm, 'roofs'):
+            blosm.roofs = True
+    else:
+        blosm.buildings = True
+
+    # Try to download the .osm file:
+    osm_file_path = os.path.join(models_path, f"{name}.osm")
+    if not os.path.exists(osm_file_path):
+        success = download_osm_file(min_lat, max_lat, min_lon, max_lon, osm_file_path)
+        if not success:
+            print("ERROR: Failed to download OSM file manually. Aborting building import.")
+            return
+    else:
+        print("The OSM file already exists")
+
+    # Create the 3D model of ht ecity:
+    blosm.osmSource = 'file'
+    blosm.osmFilepath = str(osm_file_path)
+    bpy.ops.blosm.import_data()
 
     # Clean all the extra things that are outside of the buildings:
     for obj in bpy.context.scene.objects:
@@ -207,11 +272,44 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
             if 'terrain' not in name_lower and 'buildings' not in name_lower:
                 bpy.data.objects.remove(obj, do_unlink=True)
 
+    # Add teh materials to the export of the buildings:
+    if blosm_ver == "pro":
+        for mat in bpy.data.materials:
+            if not getattr(mat, 'node_tree', None) or mat.name == "TerrainMaterial":
+                continue
+            
+            nodes = mat.node_tree.nodes
+            links = mat.node_tree.links
+            mat_out = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
+            best_img = get_image_from_tree(nodes)
+            
+            if mat_out:
+                for node in list(nodes):
+                    if node.type != 'OUTPUT_MATERIAL':
+                        nodes.remove(node)
+                
+                bsdf = nodes.new('ShaderNodeBsdfPrincipled')
+                links.new(bsdf.outputs['BSDF'], mat_out.inputs['Surface'])
+                
+                if best_img:
+                    tex_node = nodes.new('ShaderNodeTexImage')
+                    tex_node.image = best_img
+                    
+                    uv_node = nodes.new('ShaderNodeUVMap')
+                    uv_node.uv_map = "UVMap"
+                    links.new(uv_node.outputs['UV'], tex_node.inputs['Vector'])
+                    
+                    links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
+                else:
+                    vcol_node = nodes.new('ShaderNodeAttribute')
+                    vcol_node.attribute_name = "Col" 
+                    links.new(vcol_node.outputs['Color'], bsdf.inputs['Base Color'])
+
     # To avoid gazebo to crate terrrains on the 10 mi over the level of the sea move the terrain to 
     # sothe center altitude that you define:
     terrain_obj = None
     for obj in bpy.context.scene.objects:
-        if 'terrain' in obj.name.lower() and obj.type == 'MESH':
+       if 'terrain' in obj.name.lower() and obj.type == 'MESH':
             terrain_obj = obj
             break
     
@@ -245,19 +343,56 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name):
     else:
         print("WARNING: Terrain object not found for Z-axis normalization.")
 
+    # Change materials names so it doen't crash gazebo:
+    for mat in bpy.data.materials:
+        if getattr(mat, 'library', None):
+            mat.make_local()
+        # Change the name
+        try:
+            mat.name = mat.name.replace(".", "_").replace(" ", "_")
+        except Exception as e:
+            print(f"  [WARNING] Could not rename material {mat.name}: {e}")
+
+    # Strip UV nmmaps and vertex colors:
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            # Remove all UV maps except our standard "UVMap"
+            if obj.data.uv_layers:
+                obj.data.uv_layers.active.name = "UVMap" 
+                uvs_to_remove = [uv for uv in obj.data.uv_layers if uv.name != "UVMap"]
+                for uv in uvs_to_remove:
+                    obj.data.uv_layers.remove(uv)
+                    
+            # Remove all Vertex Colors except "Col"
+            if hasattr(obj.data, 'color_attributes'):
+                for vc in list(obj.data.color_attributes):
+                    obj.data.color_attributes.remove(vc)
+
     # Select all objects to export it:
-    glb_file = os.path.join(str(models_path), f"{name}.glb")
+    gltf_file = os.path.join(str(models_path), f"{name}.gltf")
     bpy.ops.file.pack_all()
     bpy.ops.object.select_all(action='SELECT')
 
-    
-    # Export the .glb file:
+    # Clean image names and pack them inside Blender BEFORE export
+    for img in bpy.data.images:
+        if getattr(img, 'library', None):
+            img.make_local()
+            
+        if img.name:
+            clean_name = img.name.replace('\\', '/').split('/')[-1].replace(' ', '_')
+            try:
+                img.name = clean_name
+                img.pack() 
+            except Exception as e:
+                print(f"  [WARNING] Could not rename/pack {img.name}: {e}")
+
+    # Export the .gltf file:
     try:
         bpy.ops.export_scene.gltf(
-            filepath=glb_file, 
-            export_format='GLB',
+            filepath=gltf_file, 
+            export_format='GLTF_SEPARATE',
             export_yup=False,
-            export_materials='EXPORT'
+            export_materials='EXPORT',
         )
         print("GLB Export successful! Textures are embedded.")
     except Exception as e:
@@ -299,7 +434,7 @@ def generate_sdf_file(name, models_folder):
                 <collision name="collision">
                     <geometry>
                     <mesh>
-                        <uri>model://{name}/{name}.glb</uri>
+                        <uri>model://{name}/{name}.gltf</uri>
                     </mesh>
                     </geometry>
                     <pose>0 0 0 0 0 0</pose>
@@ -307,7 +442,7 @@ def generate_sdf_file(name, models_folder):
                 <visual name="visual">
                     <geometry>
                     <mesh>
-                        <uri>model://{name}/{name}.glb</uri>
+                        <uri>model://{name}/{name}.gltf</uri>
                     </mesh>
                     </geometry>
                     <pose>0 0 0 0 0 0</pose>
@@ -355,7 +490,7 @@ def generate_world_file(name, worlds_folder):
                 <visual name='visual'>
                 <geometry>
                     <mesh>
-                    <uri>model://{name}/{name}.glb</uri>
+                    <uri>model://{name}/{name}.gltf</uri>
                     </mesh>
                 </geometry>
                 <pose>0 0 0 0 0 0</pose>
@@ -363,7 +498,7 @@ def generate_world_file(name, worlds_folder):
                 <collision name='collision'>
                 <geometry>
                     <mesh>
-                    <uri>model://{name}/{name}.glb</uri>
+                    <uri>model://{name}/{name}.gltf</uri>
                     </mesh>
                 </geometry>
                 <pose>0 0 0 0 0 0</pose>
@@ -425,6 +560,9 @@ lat_cen = -1.65335
 lon_length = 1.5
 lat_length = 1
 
+# Deifne teh plugin version (free or pro):
+blosm_ver = "pro"
+
 # Define the anme of the mesh file and world:
 name = "Riobamba"
 folder_name = (MODELS_FOLDER / name)
@@ -435,7 +573,7 @@ folder_name = (MODELS_FOLDER / name)
 min_lat, max_lat, min_lon, max_lon = get_bounds(lat_cen, lon_cen, lat_length, lon_length)
 
 # Run the import:
-import_osm_city(min_lat, max_lat, min_lon, max_lon, folder_name, name)
+import_osm_city(min_lat, max_lat, min_lon, max_lon, folder_name, name, blosm_ver)
 
 # Run the functions to creat the gazebo mdodels file and world:
 generate_config_file(name, folder_name)
@@ -445,5 +583,5 @@ generate_world_file(name, WORLDS_FOLDER)
 
 
 ################################# RUN CODE #################################
-# blender --background --python ""
+# blender --background --python "PATH_TO_CODE"
 ############################################################################
