@@ -139,6 +139,10 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
     # Access the addon preferences to change the server
     prefs = bpy.context.preferences.addons['blosm'].preferences
 
+    # ENABLE EXPERIMENTAL FEATURES:
+    if hasattr(prefs, 'experimental'):
+        prefs.experimental = True
+
     # Set BLOSM preferences:
     prefs.osmDir = base_osm_path
     prefs.mapboxAccessToken = MAPBOX_TOKEN
@@ -188,7 +192,7 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
             break
 
     if terrain_obj:
-        terrain_obj.data.materials.clear() #
+        terrain_obj.data.materials.clear() 
         
         mat = bpy.data.materials.new(name="TerrainMaterial")
         mat.use_nodes = True
@@ -238,6 +242,10 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
         elif hasattr(blosm, 'buildingMode'):
             blosm.buildingMode = 'REALISTIC'
             
+        # Enable the experimental texture export:
+        if hasattr(blosm, 'importForExport'):
+            blosm.importForExport = True
+            
         # Ensure premium materials and roof generation are checked
         if hasattr(blosm, 'defaultMaterials'):
             blosm.defaultMaterials = True
@@ -256,7 +264,7 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
     else:
         print("The OSM file already exists")
 
-    # Create the 3D model of ht ecity:
+    # Create the 3D model of the city:
     blosm.osmSource = 'file'
     blosm.osmFilepath = str(osm_file_path)
     bpy.ops.blosm.import_data()
@@ -271,39 +279,6 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
                 continue
             if 'terrain' not in name_lower and 'buildings' not in name_lower:
                 bpy.data.objects.remove(obj, do_unlink=True)
-
-    # Add teh materials to the export of the buildings:
-    if blosm_ver == "pro":
-        for mat in bpy.data.materials:
-            if not getattr(mat, 'node_tree', None) or mat.name == "TerrainMaterial":
-                continue
-            
-            nodes = mat.node_tree.nodes
-            links = mat.node_tree.links
-            mat_out = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
-            best_img = get_image_from_tree(nodes)
-            
-            if mat_out:
-                for node in list(nodes):
-                    if node.type != 'OUTPUT_MATERIAL':
-                        nodes.remove(node)
-                
-                bsdf = nodes.new('ShaderNodeBsdfPrincipled')
-                links.new(bsdf.outputs['BSDF'], mat_out.inputs['Surface'])
-                
-                if best_img:
-                    tex_node = nodes.new('ShaderNodeTexImage')
-                    tex_node.image = best_img
-                    
-                    uv_node = nodes.new('ShaderNodeUVMap')
-                    uv_node.uv_map = "UVMap"
-                    links.new(uv_node.outputs['UV'], tex_node.inputs['Vector'])
-                    
-                    links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
-                else:
-                    vcol_node = nodes.new('ShaderNodeAttribute')
-                    vcol_node.attribute_name = "Col" 
-                    links.new(vcol_node.outputs['Color'], bsdf.inputs['Base Color'])
 
     # To avoid gazebo to crate terrrains on the 10 mi over the level of the sea move the terrain to 
     # sothe center altitude that you define:
@@ -398,7 +373,7 @@ def import_osm_city(min_lat, max_lat, min_lon, max_lon, models_path, name, blosm
     except Exception as e:
         print(f"GLB Export failed: {e}")
 
-
+        
 
 # Function to geenrate the cofig file:
 def generate_config_file(name, models_folder):
@@ -580,8 +555,12 @@ generate_config_file(name, folder_name)
 generate_sdf_file(name, folder_name)
 generate_world_file(name, WORLDS_FOLDER)
 
+# Close Blednder:
+bpy.ops.wm.quit_blender()
+
 
 
 ################################# RUN CODE #################################
-# blender --background --python "PATH_TO_CODE"
+# blender --python "PATH_TO_CODE"
 ############################################################################
+# INFO: This code is developed for Blender 4.2 LTS version.
