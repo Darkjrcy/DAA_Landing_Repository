@@ -29,21 +29,37 @@ add_definitions(-D_USE_MATH_DEFINES)
 
 
 
-# # Create a static library to see if the dubins systems compiles correctly;
-# add_library(dubins_lib STATIC 
-#     src/uav_dubins_paths.cpp
-# )
+# Create the executbale to test if the rt_fmt works
+add_executable(rt_fmt_test_node 
+    test/fmt_test.cpp 
+    src/rt_fmt.cpp
+    src/uav_dubins_paths.cpp
+)
+# Include the eigne library:
+target_include_directories(rt_fmt_test_node PUBLIC ${EIGEN3_INCLUDE_DIRS})
+# Link the tarhet require libraryes and the matlab object files;
+target_link_libraries(rt_fmt_test_node 
+    Eigen3::Eigen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection_api.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/autonomouscodegen_dubins.o
+)
+# Link the custom message types
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(rt_fmt_test_node "${cpp_typesupport_target}")
+# Add ROS 2 dependencies
+ament_target_dependencies(rt_fmt_test_node
+    rclcpp
+    std_msgs
+    geometry_msgs
+    gnss_multipath_plugin
+)
 
-# file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/dummy_main.cpp "int main() { return 0; }")
-# add_executable(build_check ${CMAKE_CURRENT_BINARY_DIR}/dummy_main.cpp)
+#Install the executable so you can run it via 'ros2 run'
+install(TARGETS rt_fmt_test_node
+    DESTINATION lib/${PROJECT_NAME}
+)
 
-# # Link-Check with the MATLAB .o files
-# target_link_libraries(build_check 
-#     dubins_lib
-#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection.o
-#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection_api.o
-#     ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/autonomouscodegen_dubins.o  
-# )
 
 
 

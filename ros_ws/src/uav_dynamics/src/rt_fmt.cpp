@@ -7,34 +7,7 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include <random>
-#include <queue>
 #include <optional>
-
-
-
-// Structure to save the DAA qualities of an obstacle:
-struct FMTDetect {
-    // Index of obstacle:
-    std::string obstacle;
-    // Position of the obstacle (NED):
-    Eigen::Vector3d obs_pos; 
-    // Minum avoidance radius:
-    double dm;
-    // Goal for the FMT and index in the waypoints
-    Eigen::Vector4d fmt_goal;
-    int goal_idx;
-};
-
-
-
-// Structre to save the active obstacles characteristics and number of intesece obstacles:
-struct FMTBundle {
-    // Add a number of FCA detection resume:
-    std::vector<FMTDetect> act_obs;
-
-    // Number of obstacles start with zero:
-    double conflicts = 0;
-};
 
 
 
@@ -78,7 +51,7 @@ struct AnalyticObstacle {
 
 
 // Get the number of samples that the FMT requires:
-int computeSamples(const std::vector<double>& limits){
+int computeSamples(const std::vector<std::vector<double>>& limits){
     // Define the length between the limits:
     double Lx = limits[0][1] - limits[0][0];
     double Ly = limits[1][1] - limits[1][0];
@@ -165,7 +138,7 @@ std::vector<Eigen::Vector4d> sampleFree(const std::vector<int>& map, const std::
     int count = 0;
     while (count < N){
         // Get teh random position:
-        Eigen::Vector3d pt(disX(gen), disY(gen), disZ(gen), disYaw(gen));
+        Eigen::Vector4d pt(disX(gen), disY(gen), disZ(gen), disYaw(gen));
 
         // Check if an obstacle is inside:
         if (isInsideObstacles(pt.head(3), anObst)) {
@@ -255,8 +228,6 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     // Assign the planner parameters:
     S.map = map;
     S.limits = limits;
-    S.start = start;
-    S.goal = goal;
     S.w1 = opts.w1; // Heading weigth
     S.w2 = opts.w2; // Fpa weigth 
     S.N = opts.N + 2; 
@@ -268,10 +239,11 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     S.goal << goal[0], goal[1], goal[2], goal[3];
     
     // Create the Sample Free Space made by the nodes:
-    S.V = sampleFree(S.map, S.limits, S.start, S.goal, opts.N);
+    std::vector<AnalyticObstacle> empty_obstacles;
+    S.V = sampleFree(S.map, S.limits, S.start, S.goal, opts.N, empty_obstacles);
 
     // Defind the goal radius and obstacle in case in not defined:
-    S.goalRadius = std::isnan(opts.goalRadius) ? (S.rn / 2.0) : opts.goal_radius;
+    S.goalRadius = std::isnan(opts.goal_radius) ? (S.rn / 2.0) : opts.goal_radius;
     S.safeRadiusDObstacle = std::isnan(opts.safeRadiusDObstacle) ? S.rn : opts.safeRadiusDObstacle;
 
     // Define the start idx from the root:
@@ -334,9 +306,9 @@ FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles,
     const Eigen::Vector3d own_pos(own_n,own_e,-own_u);
 
     // Loop betwen all the moving obstacles to see if they intersect with the waypoints:
-    for (size_t i = 0; i < moving_obstacles.states.size(); i++){
+    for (size_t i = 0; i < moving_obstacles.intruder_states.size(); i++){
         // Get the posstion of the obstacles:
-        const auto &obs = moving_obstacles.states[i];
+        const auto &obs = moving_obstacles.intruder_states[i];
         // Define the obstacle position:
         const Eigen::Vector3d obs_pos(obs.north,obs.east,-obs.up);
         // Get the relative position:
@@ -627,7 +599,7 @@ RTFMTPLannerState updateObstructedNodes(FMTPlanner& rt_fmt_planner, FMTBundle& a
     std::vector<bool> cur(N, false);
     for (size_t i = 0; i < N; i++){
         for (const auto &o : active_obs.act_obs){
-            double distSq = (S.V[i] - o.obs_pos).squaredNorm();
+            double distSq = (S.V[i].head(3) - o.obs_pos).squaredNorm();
             if (distSq < o.dm*o.dm){
                 cur[i] = true;
                 break;
@@ -877,7 +849,7 @@ void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMT
             S.blocked[xChild] = false;
             
             // Recompute children costs with the delta (oldSeedCost)
-            recalcChildrenCost(xChild, S, conn, oldSeedCost);
+            recalChildrenCost(xChild, S, conn, oldSeedCost);
             
             cost_old = cost_new; // update best cost
         }
@@ -1040,14 +1012,14 @@ std::tuple<int, double, bool> selectBestParent(int xIdx, std::vector<int>& YNear
 // Function to re-parent the blocked children
 void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs) {
     // Extraxt a list of currrently blocked nodes:
-    std::vector<init> rewireLocalList;
+    std::vector<int> rewireLocalList;
     for (size_t i = 0; i < S.blocked.size(); ++i){
         if (S.blocked[i]) rewireLocalList.push_back(i);
     }
     if (rewireLocalList.empty()) return;
 
     // Get the first element:
-    int x = rewireLocalList.font();
+    int x = rewireLocalList.front();
     rewireLocalList.erase(rewireLocalList.begin());
     // Skip if node is inside a dynamic obstacle:
     if (S.dynamicObstructed[x]) return;

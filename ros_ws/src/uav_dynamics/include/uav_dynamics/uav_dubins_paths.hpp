@@ -73,6 +73,12 @@ class FMTDubinsConnector {
         double fpa_lim[2];
     
     public:
+        // Default constructor required by FMTPlanner
+        FMTDubinsConnector() : roll_max(0.0), Vair(0.0) {
+            fpa_lim[0] = 0.0;
+            fpa_lim[1] = 0.0;
+        }
+
         // Initilization to start the connector with the flight parameters:
         FMTDubinsConnector(double maxRollAngle, double airSpeed, double fpaMin, double fpaMax) {
             roll_max = maxRollAngle;

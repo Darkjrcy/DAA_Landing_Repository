@@ -13,17 +13,19 @@
  */
 
 // include the header file:
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include "uav_dynamics/uav_dubins_paths.hpp"
 
 
 
 // Include the external objects geenrated by matlab to use the UAV dubins connector:
-extern void* uavDubinsConnectionObj(double, double, const double*, void*, unsigned int);
-extern void autonomousDubinsDistanceCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
-extern void autonomousDubinsSegmentsCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
-extern void uavDubinsDistanceCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
+extern "C" {
+    void* uavDubinsConnectionObj(double, double, const double*, void*, unsigned int);
+    void autonomousDubinsDistanceCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
+    void autonomousDubinsSegmentsCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
+    void uavDubinsDistanceCodegen_real64(void*, const double*, unsigned int, const double*, unsigned int, bool, double, double*, double*, double*, double*, double*, double*, double*, double*);
+}
+
 
 // Start the connnection using the coder:
 namespace coder {

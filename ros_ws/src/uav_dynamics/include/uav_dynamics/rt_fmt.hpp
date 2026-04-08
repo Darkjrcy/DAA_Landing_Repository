@@ -4,6 +4,7 @@
 // Standard libraries needed for the definitio
 #include <vector>
 #include <string>
+#include <queue>
 #include <optional>
 #include <Eigen/Dense>
 
@@ -31,7 +32,7 @@ struct RTFMTOptions {
 struct  RTFMTPLannerState{
     // Parameters:
     std::vector<int> map;
-    std::vector<double> limits; // Limits shoudl be in NED
+    std::vector<std::vector<double>> limits; // Limits shoudl be in NED
     Eigen::Vector4d start;
     Eigen::Vector4d goal;
     double w1;
@@ -110,8 +111,41 @@ struct FMTPlanner {
 
 
 
+// Structure to save the DAA qualities of an obstacle:
+struct FMTDetect {
+    // Index of obstacle:
+    std::string obstacle;
+    // Position of the obstacle (NED):
+    Eigen::Vector3d obs_pos; 
+    // Minum avoidance radius:
+    double dm;
+    // Goal for the FMT and index in the waypoints
+    Eigen::Vector4d fmt_goal;
+    int goal_idx;
+};
+
+
+
+// Structre to save the active obstacles characteristics and number of intesece obstacles:
+struct FMTBundle {
+    // Add a number of FCA detection resume:
+    std::vector<FMTDetect> act_obs;
+
+    // Number of obstacles start with zero:
+    double conflicts = 0;
+};
+
+
+
 // Function to start the rt_ftm planner and create the mask witht he dubins path:
 void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<double>>& limits, const std::vector<double>& start, 
     const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2]);
+
+// Function to detect the obstacles that are obstructing the trajectory:
+FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles, double own_e, double own_n, double own_u,double own_ve, double own_vn, double own_vu,
+    double crit_time, FMTNavigationState& nav_state, double min_radius);
+
+// FUnction that executes one iteration of the RT-FMT:
+RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eigen::VectorXd& currPose);
 
 #endif
