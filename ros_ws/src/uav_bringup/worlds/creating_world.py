@@ -518,7 +518,7 @@ def generate_world_file(name, worlds_folder):
     </sdf>"""
 
     # Write teh world file:
-    world_path = os.path.join(str(worlds_folder), f"{name}.world")
+    world_path = os.path.join(str(worlds_folder), f"{name}.sdf")
     with open(world_path, "w") as f:
         f.write(world_content)
     print(f"Created world file: {world_path}")
