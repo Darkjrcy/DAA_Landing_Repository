@@ -217,7 +217,7 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     // Define the options:
     RTFMTOptions opts = rt_fmt_planner.rt_fmt_opts;
 
-    // Obtain the number of nodes if is not defined:
+    // Obtain the number of nodes if is not defined as one node seperade by each meter
     if (opts.N == -1){
         opts.N = computeSamples(limits);
     }
@@ -270,7 +270,7 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     // Initial idx:
     S.state[S.startIdx] = 1;
     S.cost[S.startIdx] = 0.0;
-    S.z = S.startIdx;
+    S.z = S.startIdx; // Current node
 
     // Populate in teh unvisited stes:
     for (size_t i = 0; i < numNodes; ++i) {
@@ -551,7 +551,7 @@ void recalChildrenCost(int seed, RTFMTPLannerState& S, FMTDubinsConnector& conn,
         int  p = S.parent[u];
 
         // Check the aprent if its the startidx add a 0 costr as it is already there:
-        if (p == S.rootIdx) {
+        if (p == -1) { 
             S.cost[u] = 0.0;
             S.blocked[u] = std::isinf(S.cost[u]);
         } else {
@@ -675,6 +675,11 @@ void reversePathToRoot(RTFMTPLannerState& S, int newRoot, int oldRoot) {
 
     // loop between all the nodes and reverse the links:
     for (size_t k = 0; k < maxHops; ++k){
+        // Prevent Out-of-Bounds Segmentation Faults
+        if (cur < 0 || cur >= static_cast<int>(S.parent.size())) {
+            break; 
+        }
+
         int next = S.parent[cur];
         S.parent[cur] = prev;
 
@@ -941,6 +946,10 @@ void setCurrentPose(const Eigen::VectorXd& q, FMTPlanner& rt_fmt_planner, FMTBun
     // FInd the neighbors:
     S.Nz = near(S.V, S.V[S.z], S.rn, S.w1, S.w2);
 
+    // Recompute the costs:
+    FMTDubinsConnector conn = rt_fmt_planner.dubins_connector;
+    recalChildrenCost(S.rootIdx, S, conn);
+
     // Get the best way to join neighbour nodes:
     rewireFromRoot2(rt_fmt_planner, S, act_obs);
 
@@ -1012,26 +1021,28 @@ std::tuple<int, double, bool> selectBestParent(int xIdx, std::vector<int>& YNear
 // Function to re-parent the blocked children
 void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs) {
     // Extraxt a list of currrently blocked nodes:
-    std::vector<int> rewireLocalList;
-    for (size_t i = 0; i < S.blocked.size(); ++i){
-        if (S.blocked[i]) rewireLocalList.push_back(i);
+    if (S.rewireLocalList.empty()) {
+        for (size_t i = 0; i < S.blocked.size(); ++i){
+            if (S.blocked[i]) S.rewireLocalList.push_back(i);
+        }
     }
-    if (rewireLocalList.empty()) return;
+    if (S.rewireLocalList.empty()) return;
 
-    // Get the first element:
-    int x = rewireLocalList.front();
-    rewireLocalList.erase(rewireLocalList.begin());
-    // Skip if node is inside a dynamic obstacle:
+    // Get the firt element:
+    int x = S.rewireLocalList.front();
+    S.rewireLocalList.pop_front();
+
+    // Skip if the node is inside a dynamic obstacle:
     if (S.dynamicObstructed[x]) return;
 
-    // Open {OPne(1) and Close{3}} states:
+    // Get the open and close states near:
     std::vector<int> targetStates = {1, 3};
     std::vector<int> YNear = nearStates(x, targetStates, S);
 
-    // Select the best Parent:
+    // Select the best parent:
     auto [yMin, yCost, isCFixed] = selectBestParent(x, YNear, rt_fmt_planner, S, act_obs);
 
-    // If it doesn't has a parent make the inital point the parent:
+    // If it has a valid parent reconnect it:
     if (yMin != -1 && isCFixed) {
         if (!std::isinf(S.cost[yMin]) && !isDescendant(yMin, x, S) && x != yMin) {
             double oldSeedCost = S.cost[x];
@@ -1043,6 +1054,8 @@ void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBu
             S.blocked[x] = false;
         }
     }
+
+    
 }
 
 
@@ -1075,6 +1088,44 @@ void addChild(int child, int parentIdx, double totalCost, RTFMTPLannerState& S) 
             if (p == parentIdx) break;
         }
     }
+}
+
+
+
+// Function to check if the edge us free to fly there:
+bool isEdgeFixedFree(int i, int j, FMTPlanner& rt_fmt_planner, const RTFMTPLannerState& S, const FMTBundle& act_obs) {
+    FMTDubinsConnector conn = rt_fmt_planner.dubins_connector;
+    
+    // Interpolate the path using Dubins
+    double state_i[4] = {S.V[i](0), S.V[i](1), S.V[i](2), S.V[i](3)};
+    double state_j[4] = {S.V[j](0), S.V[j](1), S.V[j](2), S.V[j](3)};
+    
+    // interp_pos must be true to get the intermediate points
+    DubinsInterpResult dubins_interp = interDubins(conn, state_i, state_j, 0.0, true);
+
+    //Static obstacle check
+    for (const auto& pt : dubins_interp.intposes) {
+        if (checkOccupancy(S.map, pt.head(3)) >= 0.5) { // Assuming 0.5 is your FreeThreshold
+            return false;
+        }
+    }
+
+    //  Dynamic obstacle checks
+    if (act_obs.act_obs.empty()) {
+        return true;
+    }
+
+    // If either endpoint is already flagged as dynamically obstructed, block edge
+    if (S.dynamicObstructed[i] || S.dynamicObstructed[j]) {
+        return false;
+    }
+
+    // Check if the interpolated path hits any moving obstacles
+    if (segmentIntersectsSphere3D(dubins_interp.intposes, act_obs)) {
+        return false;
+    }
+
+    return true;
 }
 
 
@@ -1130,6 +1181,23 @@ void expandTree(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundl
         S.isOpen[zClosed] = false;
         S.state[zClosed] = 3;
 
+        // Cehck unvisited neighbours:
+        auto zNbrPair = near(S.V, S.V[zClosed], S.rn, S.w1, S.w2);
+        bool zHasCF = false;
+        for (int k : zNbrPair.first) {
+            // Check if k is unvisited
+            if (std::find(S.unvis.begin(), S.unvis.end(), k) != S.unvis.end()) {
+                if (isEdgeFixedFree(zClosed, k, rt_fmt_planner, S, act_obs)) { 
+                    zHasCF = true;
+                    break;
+                }
+            }
+        }
+        if (zHasCF) {
+            S.closedToOpen[zClosed] = true;
+        }
+
+
         // FInd the new z by getting the lowest cost to expand the tree:
         S.z = -1;
         double min_cost = std::numeric_limits<double>::infinity();
@@ -1140,8 +1208,191 @@ void expandTree(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundl
             }
         }
     }
+
+    // IF THE ACTUal position is not find restart the tree:
+    if (S.z == -1) {
+        bool reopenedAny = false;
+        for (size_t i = 0; i < S.closedToOpen.size(); ++i) {
+            if (S.closedToOpen[i]) {
+                S.state[i] = 1;          
+                S.isOpen[i] = true;    
+                S.closedToOpen[i] = false;
+                reopenedAny = true;
+            }
+        }
+
+        if (reopenedAny) {
+            S.z = -1;
+            double min_cost = std::numeric_limits<double>::infinity();
+            for (size_t i = 0; i < S.isOpen.size(); ++i) {
+                if (S.isOpen[i] && S.cost[i] < min_cost) {
+                    min_cost = S.cost[i];
+                    S.z = i;
+                }
+            }
+            S.XNear.clear(); 
+        }
+    }
 }
 
+
+
+// Function to check if a nde in the goal set i=s connected to teh tree:
+std::tuple<bool, int> isInTree(const std::vector<int>& goalSet, const RTFMTPLannerState& S) {
+    int best_node = -1;
+    double min_cost = std::numeric_limits<double>::infinity();
+    bool reached = false;
+
+    // WItht eh gaol set find hte best node idx:
+    for (int g: goalSet) {
+        if (S.cost[g] < std::numeric_limits<double>::infinity() && (S.parent[g] != -1 || g == S.rootIdx)) {
+            reached = true;
+            if (S.cost[g] < min_cost) {
+                min_cost = S.cost[g];
+                best_node = g;
+            }
+        }
+    }
+
+    return {reached, best_node};
+}
+
+
+
+//FUntio to get the distance from a node to the closest node:
+double endToGoalRegionDist(int endIdx, const RTFMTPLannerState& S) {
+    double min_dist = std::numeric_limits<double>::infinity();
+    Eigen::Vector3d end_pos = S.V[endIdx].head(3);
+
+    // Get the distance between the best node and the goal
+    for (int g : S.goalRegionIdx) {
+        double d = (S.V[g].head(3) - end_pos).norm();
+        if (d < min_dist) min_dist = d;
+    }
+    return min_dist;
+}
+
+
+
+// Fucntion to obtain the parents from the goal and back to the root/:
+std::vector<int> generatePathBackward(int g, const RTFMTPLannerState& S) {
+    std::vector<int> path;
+    int curr = g;
+
+    // Go back in the tree of the current tree
+    while (curr != -1){
+        path.push_back(curr);
+        curr = S.parent[curr];
+    }
+
+    // Reverse the list so it goes to the goa, and not from the goal:
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
+
+
+// FInd the most promissing child from the tree:
+int findBestChild(int c, const RTFMTPLannerState& S){
+    int best_child = -1;
+    double min_f = std::numeric_limits<double>::infinity();
+    Eigen::Vector3d goal_pos = S.V[S.goalIdx].head(3);
+
+    // Do a foorloop t6o find a promissing chiold form the parents list using the eucledian distnace:
+    for (size_t i = 0; i < S.parent.size(); i++){
+        if (S.parent[i] == c && S.cost[i] < std::numeric_limits<double>::infinity() && !S.checkedPath[i]) {
+            double h = (S.V[i].head(3) - goal_pos).norm();
+            double f = S.cost[i] + h;
+            
+            if (f < min_f) {
+                min_f = f;
+                best_child = i;
+            }
+        }
+    }
+    return best_child;
+}
+
+
+
+// Fucntion to build a forward path from root using "best child" selection.
+std::vector<int> generatePathForward(int root, RTFMTPLannerState& S) {
+    std::vector<int> candidatePath;
+    int c = root;
+    candidatePath.push_back(c);
+
+    //Funciton to erify that the node and ial regions are not the same as goalIdx
+    auto isGoal = [&](int node) {
+        return std::find(S.goalRegionIdx.begin(), S.goalRegionIdx.end(), node) != S.goalRegionIdx.end();
+    };
+    bool nodeGoal = isGoal(c);
+
+    // Go formaward int he path:
+    while (!nodeGoal){
+        int y = findBestChild(c, S);
+        if (y != -1){
+            c = y;
+            candidatePath.push_back(c);
+            nodeGoal = isGoal(c);
+        }
+        // if it get to the father save it:
+        else {
+            S.checkedPath[c] = true;
+            S.checkedPathCandidates.push_back(c);
+            break;
+        }
+    }
+
+    return candidatePath;
+}
+
+
+
+// FUntion to generate a path from the tree:
+PathResult generatePath(RTFMTPLannerState& S){
+    PathResult result;
+
+    // Chek if goal is attached to a tree:
+    auto [goalReached, idx] = isInTree(S.goalRegionIdx, S);
+
+    // If Goal is reache create the path:
+    if (goalReached){
+        S.generatedPathIdx = generatePathBackward(idx, S);
+        result.goal_found = true;
+        result.path_found = true;
+        
+        for (int i : S.generatedPathIdx) {
+            result.waypoints.push_back(S.V[i]);
+        }
+        return result;
+    }
+
+    // If goal is not reached, search for a candidate:
+    std::vector<int> candidateIdx = generatePathForward(S.rootIdx, S);
+    int newEnd = candidateIdx.back();
+    // If there is not generated apth pass it
+    if (S.generatedPathIdx.empty()) {
+        S.generatedPathIdx = candidateIdx;
+        result.path_found = true;
+    } else {
+        // If uit exist one replace it if the new path is closer to the goal regoin:
+        int oldEnd = S.generatedPathIdx.back();
+        if (endToGoalRegionDist(newEnd, S) < endToGoalRegionDist(oldEnd, S)) {
+            S.generatedPathIdx = candidateIdx;
+            result.path_found = true;
+        } else {
+            result.path_found = true;
+        }
+    }
+
+    // If the ecnd part happen the goa is not reached pass the genrated apth and a false bool:
+    result.goal_found = false;
+    for (int i : S.generatedPathIdx) {
+        result.waypoints.push_back(S.V[i]);
+    }
+    
+    return result;
+} 
 
 
 
@@ -1163,6 +1414,14 @@ RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eig
         rewireLocally(rt_fmt_planner, S, act_obs);
         expandTree(rt_fmt_planner, S, act_obs);
         rewireFromRoot2(rt_fmt_planner, S, act_obs);
+    }
+
+    // sAVE THE EDGE LIST:
+    S.E.clear();
+    for (size_t i = 0; i < S.parent.size(); ++i) {
+        if (S.parent[i] != -1) {
+            S.E.push_back({S.parent[i], static_cast<int>(i)});
+        }
     }
 
     // Save state back to planner
