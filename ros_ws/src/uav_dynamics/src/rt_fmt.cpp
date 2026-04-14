@@ -118,7 +118,8 @@ bool isInsideObstacles(const Eigen::Vector3d& pt, const std::vector<AnalyticObst
 
 // Create the Sample Free Space of the nodes inside the limits:
 std::vector<Eigen::Vector4d> sampleFree(const std::vector<int>& map, const std::vector<std::vector<double>>& limits, 
-    const Eigen::Vector4d& start, const Eigen::Vector4d& goal, int N, const std::vector<AnalyticObstacle>& anObst){
+    const Eigen::Vector4d& start, const Eigen::Vector4d& goal, int N, const std::vector<AnalyticObstacle>& anObst,
+    const std::vector<Eigen::Vector3d>& waypoints){
     // Create the sample vector:
     std::vector<Eigen::Vector4d> samples;
     // Increase the numebr of terms respect to the nuber of nodes:
@@ -154,10 +155,40 @@ std::vector<Eigen::Vector4d> sampleFree(const std::vector<int>& map, const std::
 
     // Add th nodes in addition to the start and end that should be free:
     std::vector<Eigen::Vector4d> nodes;
-    nodes.reserve(samples.size() + 2);
-    nodes.push_back(start);
-    nodes.insert(nodes.end(), samples.begin(), samples.end());
-    nodes.push_back(goal);
+    if (!waypoints.empty()){
+        nodes.reserve(samples.size() + 2 + waypoints.size());
+        nodes.push_back(start);
+        nodes.insert(nodes.end(), samples.begin(), samples.end());
+
+        // Create teh waypoints nodes adn add them:
+        for (size_t i = 0; i < waypoints.size(); ++i) {
+            Eigen::Vector3d curr_wp = waypoints[i];
+            Eigen::Vector3d next_wp;
+
+            // If is not teh lwast wayoint point, point to the next one:
+            if (i < waypoints.size() - 1) {
+                next_wp = waypoints[i + 1];
+            } else {
+                next_wp = goal.head(3);
+            }
+            // Push the fully defined 4D waypoint into the tree
+            // Get the difference in position to get the heading:
+            double dx = next_wp.x() - curr_wp.x();
+            double dy = next_wp.y() - curr_wp.y();
+            double yaw = std::atan2(dy, dx);
+            if (yaw < 0) yaw += 2.0 * M_PI;
+            nodes.push_back(Eigen::Vector4d(curr_wp.x(), curr_wp.y(), curr_wp.z(), yaw));
+        }
+
+        // Puh it inside the goal:
+        nodes.push_back(goal);
+
+    } else{
+        nodes.reserve(samples.size() + 2);
+        nodes.push_back(start);
+        nodes.insert(nodes.end(), samples.begin(), samples.end());
+        nodes.push_back(goal);
+    }
 
     return nodes;
 }
@@ -210,7 +241,8 @@ std::pair<std::vector<int>, std::vector<Eigen::VectorXd>> near(const std::vector
 
 // Function to create the base planner:
 void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<double>>& limits, const std::vector<double>& start, 
-    const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2]){
+    const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2],
+    const std::vector<Eigen::Vector3d>& waypoints){
     // Start the state structure:
     RTFMTPLannerState S;
 
@@ -230,9 +262,14 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     S.limits = limits;
     S.w1 = opts.w1; // Heading weigth
     S.w2 = opts.w2; // Fpa weigth 
-    S.N = opts.N + 2; 
     S.expandTreeRate = opts.expandTreeRate;
     S.rn = rn;
+    // Add waypoitns for gaol and start adn waypoints inc ase it has it:
+    if (!waypoints.empty()){
+        S.N = opts.N + 2 + waypoints.size(); 
+    } else {
+        S.N = opts.N + 2;
+    }
 
     // Define the starting point and the goal:
     S.start << start[0], start[1], start[2], start[3];
@@ -240,7 +277,7 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
     
     // Create the Sample Free Space made by the nodes:
     std::vector<AnalyticObstacle> empty_obstacles;
-    S.V = sampleFree(S.map, S.limits, S.start, S.goal, opts.N, empty_obstacles);
+    S.V = sampleFree(S.map, S.limits, S.start, S.goal, opts.N, empty_obstacles, waypoints);
 
     // Defind the goal radius and obstacle in case in not defined:
     S.goalRadius = std::isnan(opts.goal_radius) ? (S.rn / 2.0) : opts.goal_radius;

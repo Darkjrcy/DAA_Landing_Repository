@@ -68,6 +68,15 @@ install(TARGETS rt_fmt_test_node
 add_executable(fixed_wing_dynamics_node
   src/fixed_wing_model.cpp
   src/geometric_guidance.cpp
+  src/rt_fmt.cpp
+  src/uav_dubins_paths.cpp
+)
+# Link the tarhet require libraryes and the matlab object files;
+target_link_libraries(fixed_wing_dynamics_node 
+    Eigen3::Eigen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/uavdubinscodegen_connection_api.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matlab_obj/autonomouscodegen_dubins.o
 )
 # Add the local messages:
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")

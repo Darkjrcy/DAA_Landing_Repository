@@ -154,7 +154,8 @@ struct PathResult {
 
 // Function to start the rt_ftm planner and create the mask witht he dubins path:
 void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<double>>& limits, const std::vector<double>& start, 
-    const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2]);
+    const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2],
+    const std::vector<Eigen::Vector3d>& waypoints = {});
 
 // Function to detect the obstacles that are obstructing the trajectory:
 FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles, double own_e, double own_n, double own_u,double own_ve, double own_vn, double own_vu,

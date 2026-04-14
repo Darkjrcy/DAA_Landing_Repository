@@ -15,8 +15,10 @@
 #include "gnss_multipath_plugin/msg/states_info.hpp"
 #include <geometry_msgs/msg/twist.hpp>
 #include <std_msgs/msg/bool.hpp>
-// Add the library 
+// Add the library of the Fast geometric avoidance ssytem:
 #include "uav_dynamics/geometric_guidance.hpp"
+// Add the library of the RT-FMT guidance system:
+#include "uav_dynamics/rt_fmt.hpp"
 
 
 // Start the class of the fixed-wing Dynamics;
@@ -51,6 +53,11 @@ class FixedWingDynamics : public rclcpp::Node{
                         180, // min_radius of turn (m)
                         0.1 // critical avoidance time (s)
                     };
+                } else if (active_avoidance_ && guidance_system_ == "FMT"){
+                    // If the avdoiance maneuver is the FMT system start by defining the configruation variables:
+                    limits_ = get_trajectory_limits(waypoints_);
+                    // Map of the world, for the moment is not used:
+                    std::vector<int> map; 
                 }
 
                 // Subscriber to the states of the avoider:
@@ -139,6 +146,13 @@ class FixedWingDynamics : public rclcpp::Node{
         };
         std::optional<GeometricAvoidanceVars> avoidance_vars_geom_;
 
+
+        // Optional variable that the needed to cerate teh rt-fmt planner:
+        // Lmits of the planner:
+        std::vector<std::vector<double>> limits_;
+        // RT-FMT Planner:
+        std::optional<FMTPlanner> rt_fmt_planner_;
+
         
 
 
@@ -176,6 +190,26 @@ class FixedWingDynamics : public rclcpp::Node{
             if (!waypoints_.empty()){
                 last_waypoint_ = waypoints_.back();
             }
+        }
+
+
+
+        // Defien the limits from the current waypoints:
+        std::vector<std::vector<double>> get_trajectory_limits(const std::vector<Eigen::Vector3d> &Waypoints){
+            std::vector<std::vector<double>> limits_way;
+            if (Waypoints.empty()) return limits_way;
+
+            // FInd the maximum and minimum N, E and D limits and add some in istance in the vertical axis:
+            auto n_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
+                [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.x() < b.x(); });
+            auto e_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
+                [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.y() < b.y(); });
+            auto d_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
+                [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.z() < b.z(); });
+
+            limits_way = {{n_lim.first->x(), n_lim.second->x()}, {e_lim.first->y(), e_lim.second->y()}, {d_lim.first->z() - 25, d_lim.second->z() + 25}};
+
+            return limits_way;
         }
 
 
