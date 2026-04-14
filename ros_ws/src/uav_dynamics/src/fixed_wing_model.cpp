@@ -6,8 +6,10 @@
 #include <vector>
 #include <array>
 #include <sstream>
+#include <utility>
 #include <cmath>
 #include <algorithm> 
+#include <numeric>
 #include <optional>
 #include <Eigen/Dense> 
 // ROS2 Messages:
@@ -54,10 +56,34 @@ class FixedWingDynamics : public rclcpp::Node{
                         0.1 // critical avoidance time (s)
                     };
                 } else if (active_avoidance_ && guidance_system_ == "FMT"){
+                    // Define hte characteristis of the rt_fmt:
+                    rt_fmt_planner_ = FMTPlanner();
+                    // NUmber of nodes:
+                    rt_fmt_planner_->rt_fmt_opts.N = 500;
+                    // Weights of the cost functio w1 (dist) and w2 (heading):
+                    rt_fmt_planner_->rt_fmt_opts.w1 = 1.0;
+                    rt_fmt_planner_->rt_fmt_opts.w2 = 1.0;
+                    // Exapansion rate:
+                    rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 20.0;
+                    // Gaol radius that it needs to be into:
+                    rt_fmt_planner_->rt_fmt_opts.goal_radius = 50.0;
+                    // SAFE radius to be from the obstacle:
+                    rt_fmt_planner_->rt_fmt_opts.safeRadiusDObstacle = 20;
+
                     // If the avdoiance maneuver is the FMT system start by defining the configruation variables:
                     limits_ = get_trajectory_limits(waypoints_);
                     // Map of the world, for the moment is not used:
                     std::vector<int> map; 
+                    // Get teh starting and goal points from waypoints:
+                    auto [start_, goal_] = GetCharacteristicPoints(waypoints_);
+                    // Deifne the airspeed from teh mean airspeed fo the trajctory:
+                    mean_air_speed_ = get_mean(cmd_vel_);
+                    // Searching radius:
+                    double rn = 20.0;
+                    
+                    // Generate the RT-FMT planner system:
+                    start_rt_fmt(map, limits_, start_, goal_, rn, rt_fmt_planner_.value(), max_roll_, mean_air_speed_, fpa_limits_);
+
                 }
 
                 // Subscriber to the states of the avoider:
@@ -150,8 +176,15 @@ class FixedWingDynamics : public rclcpp::Node{
         // Optional variable that the needed to cerate teh rt-fmt planner:
         // Lmits of the planner:
         std::vector<std::vector<double>> limits_;
+        // Objective points:
+        std::vector<double> start_;
+        std::vector<double> goal_;
         // RT-FMT Planner:
         std::optional<FMTPlanner> rt_fmt_planner_;
+        // Uav parameters (that are not defined alrady):
+        double fpa_limits_[2] = {-0.2, 0.2};
+        // Mean airspeed:
+        double mean_air_speed_;
 
         
 
@@ -210,6 +243,69 @@ class FixedWingDynamics : public rclcpp::Node{
             limits_way = {{n_lim.first->x(), n_lim.second->x()}, {e_lim.first->y(), e_lim.second->y()}, {d_lim.first->z() - 25, d_lim.second->z() + 25}};
 
             return limits_way;
+        }
+
+
+
+        // Function to get teh strat and the goal from the waypoints:
+        std::pair<std::vector<double>, std::vector<double>> GetCharacteristicPoints(const std::vector<Eigen::Vector3d> &Waypoints){
+            // DEfine the vectors:
+            std::vector<double> start_pt(4, 0.0);
+            std::vector<double> goal_pt(4, 0.0);
+
+            // Safety check:
+            if (Waypoints.empty()) {
+                return {start_pt, goal_pt};
+            }
+            if (Waypoints.size() == 1) {
+                start_pt = {Waypoints[0].x(), Waypoints[0].y(), Waypoints[0].z(), 0.0};
+                return {start_pt, start_pt};
+            }
+
+            // Calcualte the headings:
+            for (size_t i = 0; i < Waypoints.size(); i++){
+                // For teh starting and final waypoint:
+                if (i == 0){
+                    Eigen::Vector3d next_wp = Waypoints[i+1];
+                    Eigen::Vector3d curr_wp = Waypoints[i];
+                    // Get the yaw values:
+                    double dx = next_wp.x() - curr_wp.x();
+                    double dy = next_wp.y() - curr_wp.y();
+                    double yaw = std::atan2(dy, dx);
+                    // Save teh starting point:
+                    start_pt = {curr_wp.x(), curr_wp.y(), curr_wp.z(), yaw};
+
+                if (yaw < 0) yaw += 2.0 * M_PI;
+                } else if (i ==  Waypoints.size() - 1 ){
+                    Eigen::Vector3d next_wp = Waypoints[i];
+                    Eigen::Vector3d curr_wp = Waypoints[i-1];
+                    // Get the yaw values:
+                    double dx = next_wp.x() - curr_wp.x();
+                    double dy = next_wp.y() - curr_wp.y();
+                    double yaw = std::atan2(dy, dx);
+                    if (yaw < 0) yaw += 2.0 * M_PI;
+                    // Save teh starting point:
+                    goal_pt = {next_wp.x(), next_wp.y(), next_wp.z(), yaw};
+                } else {
+                    continue;
+                }   
+            }
+
+            // Return the pair of vectors cleanly
+            return {start_pt, goal_pt};
+        }
+
+
+
+        // Function to get the mean od a vector:
+        double get_mean(std::vector<double>& vec_i){
+            if (vec_i.empty()){
+                return 0.0;
+            }
+
+            double sum = std::accumulate(vec_i.begin(), vec_i.end(), 0.0);
+            double mean = sum / vec_i.size();
+            return mean;
         }
 
 
