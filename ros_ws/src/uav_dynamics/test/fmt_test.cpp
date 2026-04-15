@@ -10,7 +10,7 @@ int main() {
     std::cout << "--- Starting RT-FMT Test ---" << std::endl;
 
     // ENvironment limits
-    std::vector<std::vector<double>> limits = {{0.0, 100.0}, {0.0, 100.0}, {-50.0, 0.0}};
+    std::vector<std::vector<double>> limits = {{-20.0, 120.0}, {-20.0, 120.0}, {-30.0, -10.0}};
     std::vector<int> map; 
 
     // Start and goal
@@ -20,16 +20,16 @@ int main() {
 
     // RT-FMT planner parameters:
     FMTPlanner rt_fmt_planner;
-    rt_fmt_planner.rt_fmt_opts.N = 1000;              
+    rt_fmt_planner.rt_fmt_opts.N = 100;              
     
-    rt_fmt_planner.rt_fmt_opts.w1 = 2.0;  
-    rt_fmt_planner.rt_fmt_opts.w2 = 1.0;
+    rt_fmt_planner.rt_fmt_opts.w1 = 0.5;  
+    rt_fmt_planner.rt_fmt_opts.w2 = 0.25;
     rt_fmt_planner.rt_fmt_opts.expandTreeRate = 20.0; 
     rt_fmt_planner.rt_fmt_opts.goal_radius = 5.0; 
     rt_fmt_planner.rt_fmt_opts.safeRadiusDObstacle = 5.0;
 
     // SImple UAV parameters used for the dubins paths:
-    double rn = 10.0; 
+    double rn = 35.0; 
     double max_roll = 0.5;
     double air_speed = 15.0;
     double fpa_limits[2] = {-0.2, 0.2};
@@ -55,7 +55,7 @@ int main() {
 
     // Use current_state outside the loop so we can access it at the very end to save the nodes
     RTFMTPLannerState current_state;
-    while (dist_to_goal > 5.0 && tick_count < 1000) {
+    while (dist_to_goal > 5.0 && tick_count < 250) {
         path_file << current_pose[0] << "," << current_pose[1] << "," << current_pose[2] << "," << current_pose[3] << "\n";
         // Tick the planner
         current_state = tick(rt_fmt_planner, act_obs, current_pose);
@@ -84,21 +84,19 @@ int main() {
             // Define the taget position that you want to go from the current path:
             int targetIdx = pathIdx + 1;
             if (targetIdx >= static_cast<int>(current_path.waypoints.size())) {
-                targetIdx = current_path.waypoints.size() - 1; 
+                targetIdx = current_path.waypoints.size(); 
             }
             Eigen::Vector4d target = current_path.waypoints[targetIdx];
             Eigen::Vector3d diff = target.head(3) - current_pose.head(3);
             double dist_to_wp = diff.norm();
 
             // Get the heading assuming is moving like a reeal UAV:
-            if (dist_to_wp > 0.5) { 
-                Eigen::Vector3d dir = diff.normalized();
-                double step = std::min(2.0, dist_to_wp); 
-                current_pose.head(3) += dir * step; 
-                
-                current_pose[3] = std::atan2(dir.y(), dir.x()); 
-                if (current_pose[3] < 0) current_pose[3] += 2.0 * M_PI;
-            }
+            Eigen::Vector3d dir = diff.normalized();
+            double step = std::min(2.0, dist_to_wp); 
+            current_pose.head(3) += dir * step; 
+            
+            current_pose[3] = std::atan2(dir.y(), dir.x()); 
+            if (current_pose[3] < 0) current_pose[3] += 2.0 * M_PI;
         }
 
         // Get the distance to the goal:

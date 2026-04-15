@@ -332,9 +332,10 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
 
 
 
-// Function to identify if an obstacle is interfering the actual Trajectory thresholded by a range limit:
-FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles, double own_e, double own_n, double own_u,double own_ve, double own_vn, double own_vu,
-    double crit_time, FMTNavigationState& nav_state, double min_radius){
+// Pass to the function 
+FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles, 
+    double own_e, double own_n, double own_u, double own_ve, double own_vn, double own_vu,
+    double crit_time, double min_radius) {
     // Add a structure to save all teh conflicting obstacles:
     FMTBundle fmt_bundle;
     // Own velocity norm:
@@ -343,75 +344,31 @@ FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles,
     const Eigen::Vector3d own_pos(own_n,own_e,-own_u);
 
     // Loop betwen all the moving obstacles to see if they intersect with the waypoints:
-    for (size_t i = 0; i < moving_obstacles.intruder_states.size(); i++){
-        // Get the posstion of the obstacles:
+    for (size_t i = 0; i < moving_obstacles.intruder_states.size(); i++) {
         const auto &obs = moving_obstacles.intruder_states[i];
-        // Define the obstacle position:
-        const Eigen::Vector3d obs_pos(obs.north,obs.east,-obs.up);
-        // Get the relative position:
-        const Eigen::Vector3d rel_pos = obs_pos - own_pos;
-        // RElative position norm:
-        double r_rel = rel_pos.norm();
-        // Define the avoidance radius:
+        const Eigen::Vector3d obs_pos(obs.north, obs.east, -obs.up);
+        const double r_rel = (obs_pos - own_pos).norm();
+        
+        // Calculate dynamic avoidance radius (dm)
         const double obs_velocity_a = std::sqrt(obs.v_north*obs.v_north + obs.v_east*obs.v_east + obs.v_up*obs.v_up);
-        const double dm = 1.5*(obs_velocity_a*1.0+125+1.5*6+1.0*own_vel_a);
-        // Define the obstacle id:
+        const double dm = 1.5 * (obs_velocity_a * 1.0 + 125.0 + 1.5 * 6.0 + 1.0 * own_vel_a);
         const std::string &id = moving_obstacles.obstacles_id[i];
 
-        // Define the current idx of the Waypoints:
-        const size_t current_idx =  nav_state.current_idx;
-        // Save the searching obstacle distance:
         const double search_radius = 1.25 * (dm + min_radius + crit_time * own_vel_a);
 
-        // Chek if the obstacle is even near the ownship to try to analize it:
-        if (r_rel > search_radius * 1.5) continue;
+        // If the obstacle is close enough to care about, add it to the bundle!
+        if (r_rel <= search_radius * 1.5) {
+            fmt_bundle.conflicts += 1.0;
+            
+            FMTDetect det;
+            det.obstacle = id;
+            det.obs_pos  = obs_pos;
+            det.dm = dm;
 
-        // Obtian the waypoint that is near the search distance from the ownship:
-        if  (current_idx + 1 < nav_state.waypoints.size() - 1) {
-            for (size_t wp_idx = current_idx + 1; wp_idx < nav_state.waypoints.size() - 1; ++wp_idx) {
-                const double d_own = (nav_state.waypoints[wp_idx].head(3) - own_pos).norm();
-                // If the waypoint is within the lookahead search distance
-                if (d_own < 1.25 * search_radius) {
-                    Eigen::Vector3d dW = nav_state.waypoints[wp_idx + 1].head(3) - nav_state.waypoints[wp_idx].head(3);
-                    double ang_dW_rel = std::acos(std::clamp(rel_pos.dot(dW) / (r_rel * dW.norm()), -1.0, 1.0));
-                    if (r_rel * std::sin(ang_dW_rel) <= dm) {
-                        // Save the infermotation from the active obstacle
-                        ++fmt_bundle.conflicts;
-                        FMTDetect det;
-                        det.obstacle = id;
-                        det.obs_pos  = obs_pos;
-                        det.dm = dm;
-
-                        // Now search the goal position from the waypoints used in the RFT:
-                        bool found_safe_goal = false;
-                        for (size_t k = wp_idx + 1; k < nav_state.waypoints.size(); ++k) {
-                            double dist_to_obs = (nav_state.waypoints[k].head(3) - obs_pos).norm();
-                            if (dist_to_obs >= dm) {
-                                det.fmt_goal = nav_state.waypoints[k];
-                                det.goal_idx = k;
-                                found_safe_goal = true;
-                                break; 
-                            }
-                        }
-
-                        // If doesn't find a agoal use the last weaypoint as a goal:
-                        if (!found_safe_goal) {
-                            det.goal_idx = nav_state.waypoints.size() - 1;
-                            det.fmt_goal = nav_state.waypoints[det.goal_idx];
-                        }
-
-                        // Piut the obstacle info int he bundele:
-                        fmt_bundle.act_obs.push_back(det);
-                        break;
-
-
-                    }
-                }
-            } 
+            fmt_bundle.act_obs.push_back(det);
         }
     }
 
-    // Return teh active obstacles:
     return fmt_bundle;
 }
 
@@ -1470,7 +1427,7 @@ RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eig
 
 
 // Start by defining a searching function of obstacles:
-void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obstacles, const gnss_multipath_plugin::msg::AdsbInfo& own_state,
+void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obstacles, const gnss_multipath_plugin::msg::StatesInfo& own_state,
     double min_radius, double crit_time, FMTNavigationState& nav_state, FMTPlanner& rt_fmt_planner){
     // Get the ownship data:
     const double own_e  = own_state.east;
@@ -1480,15 +1437,54 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
     const double own_vn = own_state.v_north;
     const double own_vu = own_state.v_up;
     const double own_course = own_state.course;
-    const double own_fpa = own_state.fpa;
+    const double own_vel_a = std::sqrt(own_vn*own_vn + own_ve*own_ve + own_vu*own_vu);
 
     // Identify it there is an obstacle neart the next waypoints:
-    FMTBundle active_obs = FMT_Detect(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, crit_time, nav_state, min_radius);
+    FMTBundle active_obs = FMT_Detect(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, crit_time, min_radius);
 
     // If there nor conflict exit:
     if (active_obs.conflicts == 0){
         return;
     }
-        
-    
+
+    // Define the current position of the UAV:
+    Eigen::VectorXd current_pose(4); 
+    current_pose << own_n, own_e, -own_u, own_course;
+
+    // If there ir any obstacle do a tick to make it continue:
+    RTFMTPLannerState current_state = tick(rt_fmt_planner, active_obs, current_pose);
+
+    // Get the path enhance it in the waypoints:
+    PathResult current_path = generatePath(current_state);
+    if (current_path.path_found && !current_path.waypoints.empty()){
+        std::vector<Eigen::Vector3d> updated_waypoints;
+        std::vector<double> updated_cmd_vel;
+
+        // Preserve all the past waypoints before the current idx:
+        for (size_t i = 0; i < nav_state.current_idx; i++){
+            updated_waypoints.push_back(nav_state.waypoints[i].head(3));
+            updated_cmd_vel.push_back(nav_state.cmd_vel[i]);
+        }
+
+        // Append the path created by the FMT:
+        for (size_t i = 0; i < current_path.waypoints.size(); i++){
+            updated_waypoints.push_back(current_path.waypoints[i].head(3));
+            updated_cmd_vel.push_back(own_vel_a);
+        }
+
+        // Ensure the las point is the goal:
+        Eigen::Vector3d ultimate_goal = nav_state.waypoints.back();
+        double ultimate_vel = nav_state.cmd_vel.back();
+
+        // Check if the FMT already accounts for the ultimate goal:
+        double dist_to_ultimate = (updated_waypoints.back().head(3) - ultimate_goal.head(3)).norm();
+        if (dist_to_ultimate > 1.0) { 
+            updated_waypoints.push_back(ultimate_goal);
+            updated_cmd_vel.push_back(ultimate_vel);
+        }
+
+        // Save it in te navigation state:
+        nav_state.waypoints = updated_waypoints;
+        nav_state.cmd_vel = updated_cmd_vel;
+    }
 }

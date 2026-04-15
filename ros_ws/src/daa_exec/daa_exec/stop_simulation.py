@@ -14,24 +14,23 @@ class StopSimulation(Node):
             self.stop_simulation_callback,
             10
         )
-        
-        # Add the exact names of the executables you want to aggressively eliminate:
+    
         self.target_processes = [
-            "save_uav_info_node",
-            "fixed_wing_dynamics_node",
-            "gz",
+            "ruby",      
+            "gz-sim",
+            "gz sim",
+            "ros2",
+            "--ros-args"
         ]
     
     def stop_simulation_callback(self, msg):
         if msg.data:
             self.get_logger().warn("Shutdown signal received! Eliminating all simulation processes...")
             
-            # Hunt down and kill each target process
             for proc in self.target_processes:
-                self.get_logger().info(f"Executing killall -9 on {proc}...")
-                # We use DEVNULL to hide the terminal output if the process is already dead
+                self.get_logger().info(f"Executing pkill -9 -f on {proc}...")
                 subprocess.call(
-                    ["killall", "-9", proc], 
+                    ["pkill", "-9", "-f", "--", proc], 
                     stderr=subprocess.DEVNULL, 
                     stdout=subprocess.DEVNULL
                 )
@@ -40,7 +39,7 @@ class StopSimulation(Node):
             time.sleep(1.0)
             
             self.get_logger().info("All targeted processes eliminated. Exiting master node...")
-            os._exit(0)  # Forcefully stop this python node
+            os._exit(0) 
 
 def main(args=None):
     rclpy.init(args=args)

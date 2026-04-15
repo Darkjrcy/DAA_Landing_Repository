@@ -55,14 +55,16 @@ class FixedWingDynamics : public rclcpp::Node{
                         180, // min_radius of turn (m)
                         0.1 // critical avoidance time (s)
                     };
+
+                    RCLCPP_INFO(this->get_logger(), "Geometric avoidance system created.");
                 } else if (active_avoidance_ && guidance_system_ == "FMT"){
                     // Define hte characteristis of the rt_fmt:
                     rt_fmt_planner_ = FMTPlanner();
-                    // NUmber of nodes:
-                    rt_fmt_planner_->rt_fmt_opts.N = 500;
+                    // NUmber of nodes cacualted with a distance we wnat them to be separed average:
+                    rt_fmt_planner_->rt_fmt_opts.N = 2000;
                     // Weights of the cost functio w1 (dist) and w2 (heading):
-                    rt_fmt_planner_->rt_fmt_opts.w1 = 1.0;
-                    rt_fmt_planner_->rt_fmt_opts.w2 = 1.0;
+                    rt_fmt_planner_->rt_fmt_opts.w1 = 0.5;
+                    rt_fmt_planner_->rt_fmt_opts.w2 = 0.25;
                     // Exapansion rate:
                     rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 20.0;
                     // Gaol radius that it needs to be into:
@@ -79,11 +81,12 @@ class FixedWingDynamics : public rclcpp::Node{
                     // Deifne the airspeed from teh mean airspeed fo the trajctory:
                     mean_air_speed_ = get_mean(cmd_vel_);
                     // Searching radius:
-                    double rn = 20.0;
+                    double rn = mean_distance_nodes(limits_, rt_fmt_planner_->rt_fmt_opts.N);
                     
                     // Generate the RT-FMT planner system:
                     start_rt_fmt(map, limits_, start_, goal_, rn, rt_fmt_planner_.value(), max_roll_, mean_air_speed_, fpa_limits_);
-
+                    
+                    RCLCPP_INFO(this->get_logger(), "FMT avoidance system created.");
                 }
 
                 // Subscriber to the states of the avoider:
@@ -240,7 +243,7 @@ class FixedWingDynamics : public rclcpp::Node{
             auto d_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
                 [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.z() < b.z(); });
 
-            limits_way = {{n_lim.first->x(), n_lim.second->x()}, {e_lim.first->y(), e_lim.second->y()}, {d_lim.first->z() - 25, d_lim.second->z() + 25}};
+            limits_way = {{n_lim.first->x()-250, n_lim.second->x()+250}, {e_lim.first->y()-250, e_lim.second->y()+250}, {d_lim.first->z()-50, d_lim.second->z()+50}};
 
             return limits_way;
         }
@@ -306,6 +309,41 @@ class FixedWingDynamics : public rclcpp::Node{
             double sum = std::accumulate(vec_i.begin(), vec_i.end(), 0.0);
             double mean = sum / vec_i.size();
             return mean;
+        }
+
+
+
+        // Funvtion to get the average ditance radius of separation between nodes using Newton-Raphson:
+        double mean_distance_nodes(std::vector<std::vector<double>> limits, double N){
+            // Defoine the lengths of the limits:
+            double l1 = limits[0][1]-limits[0][0];
+            double l2 = limits[1][1]-limits[1][0];
+            double l3 = limits[2][1]-limits[2][0];
+
+            // Newton rhapson variables:
+            double volume = l1 * l2 * l3;
+            double x0 = std::cbrt(volume / N); 
+            double x1 = 0.0;
+            int iter = 0;
+
+            // DO Newton rahson:
+            while (iter < 20){
+                double f_x = (l1 + x0) * (l2 + x0) * (l3 + x0) - N * std::pow(x0, 3);
+                double df_x = (l1 * l2 + l1 * l3 + l2 * l3) 
+                              + 2.0 * x0 * (l1 + l2 + l3) 
+                              + 3.0 * std::pow(x0, 2) 
+                              - 3.0 * N * std::pow(x0, 2);
+
+                // Break if the difference si small:
+                if (std::abs(df_x) < 1e-9) break;
+
+                // Update:
+                x1 = x0 - (f_x / df_x);
+                if (std::abs(x0-x1) < 1e-4) break;
+                x0 = x1;
+                iter ++;
+            }
+            return x1;
         }
 
 
@@ -507,7 +545,19 @@ class FixedWingDynamics : public rclcpp::Node{
                         }
                     }
                 }
-                // If you do the rt_fmt, please remember you need to add the heanding to the waypoints:
+
+                // Use teh FMT:
+                if (guidance_system_ == "FMT"){
+                    // reduce the lookahead radius and the trnasition radius to make it more maneuverable
+                    transition_radius_ = 100;   
+
+                    look_ahead_distance_ = 50;
+                    // Add the minimum raduis to the avodance parameters.
+                    avoidance_vars_geom_->min_radius = min_radius_;
+                    avoidance_vars_geom_->crit_time = 1.0;
+
+                    // NOTE: Because teh RT-FMT qorks based on teh goal after it starts working it is not freaseble to ave a last point of avoidance.
+                }
             }
 
             // Do stop system to stop if is near teh last waypoint:
@@ -580,6 +630,23 @@ class FixedWingDynamics : public rclcpp::Node{
                     avoidance_vars_geom_->min_radius, 
                     avoidance_vars_geom_->crit_time, 
                     nav_state
+                );
+            } else if (guidance_system_ == "FMT" ) {
+                FMTNavigationState nav_state_fmt{
+                    waypoints_,
+                    cmd_vel_,
+                    current_idx,
+                    transition_radius_,
+                    look_ahead_distance_, 
+                };
+
+                computerFMTAvoidance(
+                    *msg,
+                    avoider_current_state_, 
+                    avoidance_vars_geom_->min_radius, 
+                    avoidance_vars_geom_->crit_time, 
+                    nav_state_fmt,
+                    rt_fmt_planner_.value()
                 );
             }
 

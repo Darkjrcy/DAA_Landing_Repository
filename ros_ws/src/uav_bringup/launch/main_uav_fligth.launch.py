@@ -63,7 +63,7 @@ def launch(context, *args, **kwargs):
 
     # Launch Arguments for Spawning:
     # Type of the UAVs (fixed_wing, vtol):
-    type_uav = ["vtol", "fixed_wing", "fixed_wing"]
+    type_uav = ["fixed_wing", "fixed_wing", "fixed_wing"]
     # Launch airplane arguments:
     robot_names = ["airplane_1", "airplane_2", "airplane_3"]
     # Create the spawning positions randomlly:
@@ -71,7 +71,7 @@ def launch(context, *args, **kwargs):
     robot_scale = ["0.7", "0.7", "0.7"]
     camera_num = ["1.0", "0.0", "0.0"]
     # Launch arguments for the world:
-    world = "ERAU.sdf"
+    world = "Riobamba.sdf"
     world_name = get_world_name(world)
     # Fog characteristis:
     fog_lifetime="10.0"
@@ -96,8 +96,8 @@ def launch(context, *args, **kwargs):
     ]
     # Define which of the UAVs have aviodance:
     has_avoidance = [True, False, False]
-    # The type of guidance DAA algorithm it uses ("GEOMETRIC", ...) if doesn';t use put "NONE":
-    type_avoidance = ["GEOMETRIC", "NONE", "NONE"]
+    # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
+    type_avoidance = ["FMT", "NONE", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################
