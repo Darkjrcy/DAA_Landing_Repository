@@ -61,12 +61,12 @@ class FixedWingDynamics : public rclcpp::Node{
                     // Define hte characteristis of the rt_fmt:
                     rt_fmt_planner_ = FMTPlanner();
                     // NUmber of nodes cacualted with a distance we wnat them to be separed average:
-                    rt_fmt_planner_->rt_fmt_opts.N = 2000;
+                    rt_fmt_planner_->rt_fmt_opts.N = 1000;
                     // Weights of the cost functio w1 (dist) and w2 (heading):
-                    rt_fmt_planner_->rt_fmt_opts.w1 = 0.5;
-                    rt_fmt_planner_->rt_fmt_opts.w2 = 0.25;
+                    rt_fmt_planner_->rt_fmt_opts.w1 = 0.25;
+                    rt_fmt_planner_->rt_fmt_opts.w2 = 50.0;
                     // Exapansion rate:
-                    rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 20.0;
+                    rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 5.0;
                     // Gaol radius that it needs to be into:
                     rt_fmt_planner_->rt_fmt_opts.goal_radius = 50.0;
                     // SAFE radius to be from the obstacle:
@@ -82,6 +82,7 @@ class FixedWingDynamics : public rclcpp::Node{
                     mean_air_speed_ = get_mean(cmd_vel_);
                     // Searching radius:
                     double rn = mean_distance_nodes(limits_, rt_fmt_planner_->rt_fmt_opts.N);
+                    rn = rn * 5.0;
                     
                     // Generate the RT-FMT planner system:
                     start_rt_fmt(map, limits_, start_, goal_, rn, rt_fmt_planner_.value(), max_roll_, mean_air_speed_, fpa_limits_);
@@ -243,7 +244,7 @@ class FixedWingDynamics : public rclcpp::Node{
             auto d_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
                 [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.z() < b.z(); });
 
-            limits_way = {{n_lim.first->x()-250, n_lim.second->x()+250}, {e_lim.first->y()-250, e_lim.second->y()+250}, {d_lim.first->z()-50, d_lim.second->z()+50}};
+            limits_way = {{n_lim.first->x()-400, n_lim.second->x()+400}, {e_lim.first->y()-400, e_lim.second->y()+400}, {d_lim.first->z()-20, d_lim.second->z()+20}};
 
             return limits_way;
         }
@@ -549,12 +550,12 @@ class FixedWingDynamics : public rclcpp::Node{
                 // Use teh FMT:
                 if (guidance_system_ == "FMT"){
                     // reduce the lookahead radius and the trnasition radius to make it more maneuverable
-                    transition_radius_ = 100;   
+                    transition_radius_ = 150;   
 
-                    look_ahead_distance_ = 50;
+                    look_ahead_distance_ = 100;
                     // Add the minimum raduis to the avodance parameters.
                     avoidance_vars_geom_->min_radius = min_radius_;
-                    avoidance_vars_geom_->crit_time = 1.0;
+                    avoidance_vars_geom_->crit_time = 0.1;
 
                     // NOTE: Because teh RT-FMT qorks based on teh goal after it starts working it is not freaseble to ave a last point of avoidance.
                 }
