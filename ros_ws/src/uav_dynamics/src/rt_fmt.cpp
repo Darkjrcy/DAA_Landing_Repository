@@ -205,12 +205,12 @@ std::tuple <std::vector<Eigen::Vector4d>, std::vector<int>> sampleFree(const std
 
 
 // Function to get the cost of the chilren nodes and apply any important logic:
-double getBiasCost(int childIdx, double parentCost, double pathLength, double charcCost, const RTFMTPLannerState& S){
-    double total_add_cost = pathLength + charcCost;
+double getBiasCost(int childIdx, double parentCost, double pathLength, double headingPenalty, const RTFMTPLannerState& S){
+    double total_add_cost = pathLength + headingPenalty;
 
     // Check if the child is inside a waypoint
     if (std::find(S.waypoint_location.begin(), S.waypoint_location.end(), childIdx) != S.waypoint_location.end()) {
-        return parentCost + (total_add_cost / 5.0);
+        return parentCost + (total_add_cost / 4.0);
     }
     return parentCost + total_add_cost;
 }
@@ -238,7 +238,7 @@ std::vector<double> costMetric(const std::vector<Eigen::Vector4d>& V, const std:
 
         // Reduce the cost if its a waypoint:
         if (std::find(waypoint_idx.begin(), waypoint_idx.end(), i) != waypoint_idx.end()){
-            costs[i] = costs[i] / 10.0;
+            costs[i] = costs[i] / 4;
         }
     }
     return costs;
@@ -449,8 +449,8 @@ Eigen::VectorXd interpPose(const coder::uavDubinsPathSegment& seg, double target
             // Straight line kinematics
             pose[0] = x0 + d_xy * std::cos(psi0);
             pose[1] = y0 + d_xy * std::sin(psi0);
-            pose[2] = z0 + d_z;
-            pose[3] = psi0; 
+            pose[2] = z0 - d_z; 
+            pose[3] = psi0;
         }
         // Left turn or Left Heliz kinematics:
         else if (dir == 'L' || dir == 'l') {
@@ -459,7 +459,7 @@ Eigen::VectorXd interpPose(const coder::uavDubinsPathSegment& seg, double target
 
             pose[0] = x0 + R * (std::sin(psi0 + delta_psi) - std::sin(psi0));
             pose[1] = y0 - R * (std::cos(psi0 + delta_psi) - std::cos(psi0));
-            pose[2] = z0 + d_z;
+            pose[2] = z0 - d_z; 
             pose[3] = wrapTo2Pi(psi0 + delta_psi);
         }
         // Right turn or Right helix kinematics
@@ -469,7 +469,7 @@ Eigen::VectorXd interpPose(const coder::uavDubinsPathSegment& seg, double target
 
             pose[0] = x0 - R * (std::sin(psi0 + delta_psi) - std::sin(psi0));
             pose[1] = y0 + R * (std::cos(psi0 + delta_psi) - std::cos(psi0));
-            pose[2] = z0 + d_z;
+            pose[2] = z0 - d_z;
             pose[3] = wrapTo2Pi(psi0 + delta_psi);
         }
 
@@ -499,7 +499,7 @@ DubinsInterpResult interDubins(FMTDubinsConnector& conn, const double state1[4],
     if (interp_pos){
         if (dist > 1e-6){
             // Define an interval to do the segmentation:
-            double interval_dist = 10.0;
+            double interval_dist = 50.0;
 
             // Loop though and clacualte the exact pose at each distance:
             for (double current_dist = 0.0; current_dist < dist; current_dist += interval_dist) {
@@ -525,7 +525,7 @@ DubinsInterpResult interDubins(FMTDubinsConnector& conn, const double state1[4],
 
 
 // FUnction to recall the costs of childrens nodes:
-void recalChildrenCost(int seed, RTFMTPLannerState& S, FMTDubinsConnector& conn, const Eigen::VectorXd& ownVel, std::optional<double> oldSeedCost = std::nullopt){
+void recalChildrenCost(int seed, RTFMTPLannerState& S, FMTDubinsConnector& conn, std::optional<double> oldSeedCost = std::nullopt){
     // Define the numer of nodes:
     size_t N = S.V.size();
 
@@ -590,25 +590,16 @@ void recalChildrenCost(int seed, RTFMTPLannerState& S, FMTDubinsConnector& conn,
                 // Pass the arrays to interDubins
                 DubinsInterpResult dubins_interp = interDubins(conn, state_p, state_u, 0.0, false);
 
-                // Change the headng penalty to basd on teh raltive direction and the act velocity:
-                Eigen::Vector3d rel_pos = S.V[u].head(3) - S.V[p].head(3);
-                // Get a characteristic variable that is realted tothe angle betwen the actual and next point:
-                double char_val = 0.0;
-                if (rel_pos.norm() > 1e-6 && ownVel.norm() > 1e-6) {
-                    double dot = rel_pos.normalized().dot(ownVel.normalized());
-                    if (dot < 0.05) { 
-                        char_val = std::numeric_limits<double>::infinity();
-                    } else {
-                        char_val = 1.0 - dot;
-                    }
-                }
-                
+                // Cckacualte teh cost:
+                double rawPsi = std::abs(S.V[p](3) - S.V[u](3));
+                double d_heading = std::min(rawPsi, 2.0 * M_PI - rawPsi);
+                double headingPenalty = std::pow(S.w1 * d_heading, 2);
                 
                 // Check if the node is part of the waypoints to reduce the cost:
                 if (std::find(S.waypoint_location.begin(), S.waypoint_location.end(), u) != S.waypoint_location.end()) {
-                    S.cost[u] = S.cost[p] + (dubins_interp.totalCost + S.w2 * char_val) / 10;
+                    S.cost[u] = S.cost[p] + (dubins_interp.totalCost + headingPenalty) / 4;
                 } else {
-                    S.cost[u] = S.cost[p] + dubins_interp.totalCost + S.w2 * char_val;
+                    S.cost[u] = S.cost[p] + dubins_interp.totalCost + headingPenalty;
                 }
                 
                 // Analyze if hte node is blocekd:
@@ -625,39 +616,9 @@ void recalChildrenCost(int seed, RTFMTPLannerState& S, FMTDubinsConnector& conn,
 }
 
 
-// Check if the interpolated path collides with any dynamic obstacle
-bool segmentIntersectsSphere3D(const std::vector<Eigen::VectorXd>& pts, const FMTBundle& dynObs) {
-    bool collides = false;
-
-    if (pts.empty() || dynObs.act_obs.empty()) {
-        return collides;
-    }
-
-    // Loop through every point in the interpolated Dubins path
-    for (const auto& pt : pts) {
-        Eigen::Vector3d pt3d = pt.head(3);
-        
-        // Loop through every dynamic obstacle
-        for (const auto& obs : dynObs.act_obs) {
-            // Squared distance: dx^2 + dy^2 + dz^2
-            double dist2 = (pt3d - obs.obs_pos).squaredNorm();
-            
-            // Compare against safety radius squared
-            if (dist2 <= (obs.dm * obs.dm)) {
-                collides = true;
-                return collides;
-            }
-        }
-    }
-    
-    return collides;
-}
-
-
-
 
 // Function to update/block near dynamic obstacles:
-RTFMTPLannerState updateObstructedNodes(FMTPlanner& rt_fmt_planner, FMTBundle& active_obs, const Eigen::VectorXd& ownVel) {
+RTFMTPLannerState updateObstructedNodes(FMTPlanner& rt_fmt_planner, FMTBundle& active_obs) {
     // Start by defning the Mask:
     RTFMTPLannerState& S = rt_fmt_planner.ft_fmt_mask;
     // Dubins connector:
@@ -701,7 +662,7 @@ RTFMTPLannerState updateObstructedNodes(FMTPlanner& rt_fmt_planner, FMTBundle& a
         if (!S.blocked[t]){
             S.cost[t] = std::numeric_limits<double>::infinity();
             S.blocked[t] = true;
-            recalChildrenCost(t, S, conn, ownVel);
+            recalChildrenCost(t, S, conn);
         }
     }
 
@@ -714,49 +675,21 @@ RTFMTPLannerState updateObstructedNodes(FMTPlanner& rt_fmt_planner, FMTBundle& a
         if (p == S.rootIdx) { 
             S.cost[t] = 0.0;
             S.blocked[t] = false;
-            recalChildrenCost(t, S, conn, ownVel);
+            recalChildrenCost(t, S, conn);
         } // FOr the other cases clacualte the new costs
         else if (p != -1 && S.cost[p] < std::numeric_limits<double>::infinity()) {
             double state_p[4] = {S.V[p](0), S.V[p](1), S.V[p](2), S.V[p](3)};
             double state_t1[4] = {S.V[t](0), S.V[t](1), S.V[t](2), S.V[t](3)};
             DubinsInterpResult dubins_interp_1 = interDubins(conn, state_p, state_t1, 0.0, false);
-            
-            // Get the new characteistic cost basde ont eh relative positio:
-            Eigen::Vector3d rel_pos = S.V[t].head(3) - S.V[p].head(3);
-            double charc_cost = 0.0;
-            if (rel_pos.norm() > 1e-6 && ownVel.norm() > 1e-6) {
-                double dot = rel_pos.normalized().dot(ownVel.normalized());
-                if (dot < 0.05) { 
-                    charc_cost = std::numeric_limits<double>::infinity();
-                } else {
-                    charc_cost = 1.0 - dot;
-                }
-            }
+            double rawPsi = std::abs(S.V[p](3) - S.V[t](3));
+            double d_heading = std::min(rawPsi, 2.0 * M_PI - rawPsi);
+            double headingPenalty = std::pow(S.w1 * d_heading, 2);
 
             // Check if the node is part of the waypoints to reduce the cost:
-            S.cost[t] = getBiasCost(t, S.cost[p], dubins_interp_1.totalCost, charc_cost, S);
+            S.cost[t] = getBiasCost(t, S.cost[p], dubins_interp_1.totalCost, headingPenalty, S);
             S.blocked[t] = false;
 
-            recalChildrenCost(t, S, conn, ownVel);
-        }
-    }
-
-    // Cehcl if edges are being obstructed:
-    for (size_t i = 0; i < N; ++i) {
-        int p = S.parent[i];
-        // If it has a parent and neither is already blocked
-        if (p != -1 && !S.blocked[i] && !S.blocked[p]) {
-            double state_p[4] = {S.V[p](0), S.V[p](1), S.V[p](2), S.V[p](3)};
-            double state_i[4] = {S.V[i](0), S.V[i](1), S.V[i](2), S.V[i](3)};
-            
-            DubinsInterpResult check_interp = interDubins(conn, state_p, state_i, 0.0, true);
-            
-            // If the moving obstacle severed this path, destroy the edge!
-            if (segmentIntersectsSphere3D(check_interp.intposes, active_obs)) {
-                S.cost[i] = std::numeric_limits<double>::infinity();
-                S.blocked[i] = true;
-                recalChildrenCost(i, S, conn, ownVel);
-            }
+            recalChildrenCost(t, S, conn);
         }
     }
 
@@ -851,8 +784,38 @@ std::vector<int> nearStates(int xIdx, const std::vector<int>& stateDes, const RT
 
 
 
+// Check if the interpolated path collides with any dynamic obstacle
+bool segmentIntersectsSphere3D(const std::vector<Eigen::VectorXd>& pts, const FMTBundle& dynObs) {
+    bool collides = false;
+
+    if (pts.empty() || dynObs.act_obs.empty()) {
+        return collides;
+    }
+
+    // Loop through every point in the interpolated Dubins path
+    for (const auto& pt : pts) {
+        Eigen::Vector3d pt3d = pt.head(3);
+        
+        // Loop through every dynamic obstacle
+        for (const auto& obs : dynObs.act_obs) {
+            // Squared distance: dx^2 + dy^2 + dz^2
+            double dist2 = (pt3d - obs.obs_pos).squaredNorm();
+            
+            // Compare against safety radius squared
+            if (dist2 <= (obs.dm * obs.dm)) {
+                collides = true;
+                return collides;
+            }
+        }
+    }
+    
+    return collides;
+}
+
+
+
 // Function to build and find the best way o joining near nodes:
-void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& active_obs, const Eigen::VectorXd& ownVel) {
+void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& active_obs) {
     FMTDubinsConnector conn = rt_fmt_planner.dubins_connector;
 
     // Initialize rewire frontier from root if needed
@@ -896,19 +859,12 @@ void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMT
         double state_x[4] = {S.V[xChild](0), S.V[xChild](1), S.V[xChild](2), S.V[xChild](3)};
         DubinsInterpResult dubins_interp = interDubins(conn, state_y, state_x, 0.0, true);
 
-        // Get the new characteistic cost basde ont eh relative positio:
-        Eigen::Vector3d rel_pos = S.V[xChild].head(3) - S.V[y].head(3);
-        double charc_cost = 0.0;
-        if (rel_pos.norm() > 1e-6 && ownVel.norm() > 1e-6) {
-            double dot = rel_pos.normalized().dot(ownVel.normalized());
-            if (dot < 0.05) { 
-                charc_cost = std::numeric_limits<double>::infinity();
-            } else {
-                charc_cost = 1.0 - dot;
-            }
-        }
-
-        double cost_new = getBiasCost(xChild, S.cost[y], dubins_interp.totalCost, charc_cost, S);
+        // GEt the new cost:
+        double rawPsi = std::abs(S.V[xChild](3) - S.V[y](3));
+        double d_heading = std::min(rawPsi, 2.0 * M_PI - rawPsi);
+        double headingPenalty = std::pow(S.w1 * d_heading, 2);
+        // Check if the node is part of the waypoints to reduce the cost:
+        double cost_new = getBiasCost(xChild, S.cost[y], dubins_interp.totalCost, headingPenalty, S);
         
         // Static obstacle check along the interpolated points:
         bool tf_static = true;
@@ -934,7 +890,7 @@ void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMT
             S.blocked[xChild] = false;
             
             // Recompute children costs with the delta (oldSeedCost)
-            recalChildrenCost(xChild, S, conn, ownVel, oldSeedCost);
+            recalChildrenCost(xChild, S, conn, oldSeedCost);
             
             cost_old = cost_new; // update best cost
         }
@@ -952,7 +908,7 @@ void rewireFromRoot2(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMT
 
 
 // Set the current pose as the root of the tree:
-void setCurrentPose(const Eigen::VectorXd& q, FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eigen::VectorXd& ownVel) {
+void setCurrentPose(const Eigen::VectorXd& q, FMTPlanner& rt_fmt_planner, FMTBundle& act_obs) {
     RTFMTPLannerState& S = rt_fmt_planner.ft_fmt_mask;
 
     // If is the first root:
@@ -1028,10 +984,10 @@ void setCurrentPose(const Eigen::VectorXd& q, FMTPlanner& rt_fmt_planner, FMTBun
 
     // Recompute the costs:
     FMTDubinsConnector conn = rt_fmt_planner.dubins_connector;
-    recalChildrenCost(S.rootIdx, S, conn, ownVel);
+    recalChildrenCost(S.rootIdx, S, conn);
 
     // Get the best way to join neighbour nodes:
-    rewireFromRoot2(rt_fmt_planner, S, act_obs, ownVel);
+    rewireFromRoot2(rt_fmt_planner, S, act_obs);
 
     // DEfine the new root IDX:
     S.lastRootIdx = S.rootIdx;
@@ -1042,7 +998,7 @@ void setCurrentPose(const Eigen::VectorXd& q, FMTPlanner& rt_fmt_planner, FMTBun
 
 // Evaluate candidate parents and check for collisions:
 std::tuple<int, double, bool> selectBestParent(int xIdx, std::vector<int>& YNear, 
-    FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs, const Eigen::VectorXd& ownVel) {
+    FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs) {
     // Get the best idx:
     int yMin = -1;
     double yCost = std::numeric_limits<double>::infinity();
@@ -1064,21 +1020,12 @@ std::tuple<int, double, bool> selectBestParent(int xIdx, std::vector<int>& YNear
         double state_c[4] = {childState(0), childState(1), childState(2), childState(3)};
         DubinsInterpResult dubins_interp = interDubins(conn, state_p, state_c, 0.0, true);
 
-        // Get the new characteistic cost basde ont eh relative positio:
-        Eigen::Vector3d rel_pos = childState.head(3) - parentState.head(3);
-        double charc_cost = 0.0;
-        if (rel_pos.norm() > 1e-6 && ownVel.norm() > 1e-6) {
-            double dot = rel_pos.normalized().dot(ownVel.normalized());
-            if (dot < 0.05) { 
-                charc_cost = std::numeric_limits<double>::infinity();
-            } else {
-                charc_cost = 1.0 - dot;
-            }
-        }
-
+        double rawPsi = std::abs(childState(3) - parentState(3));
+        double d_heading = std::min(rawPsi, 2.0 * M_PI - rawPsi);
+        double headingPenalty = std::pow(S.w1 * d_heading, 2);
     
         // Check if the node is part of the waypoints to reduce the cost:
-        double totalCost = getBiasCost(xIdx, S.cost[y], dubins_interp.totalCost, charc_cost, S);
+        double totalCost = getBiasCost(xIdx, S.cost[y], dubins_interp.totalCost, headingPenalty, S);
         
         
         // If new cost is best than past code update:
@@ -1110,7 +1057,7 @@ std::tuple<int, double, bool> selectBestParent(int xIdx, std::vector<int>& YNear
 
 
 // Function to re-parent the blocked children
-void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs, const Eigen::VectorXd& ownVel) {
+void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs) {
     // Extraxt a list of currrently blocked nodes:
     if (S.rewireLocalList.empty()) {
         for (size_t i = 0; i < S.blocked.size(); ++i){
@@ -1131,7 +1078,7 @@ void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBu
     std::vector<int> YNear = nearStates(x, targetStates, S);
 
     // Select the best parent:
-    auto [yMin, yCost, isCFixed] = selectBestParent(x, YNear, rt_fmt_planner, S, act_obs, ownVel);
+    auto [yMin, yCost, isCFixed] = selectBestParent(x, YNear, rt_fmt_planner, S, act_obs);
 
     // If it has a valid parent reconnect it:
     if (yMin != -1 && isCFixed) {
@@ -1141,7 +1088,7 @@ void rewireLocally(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBu
             S.cost[x] = yCost;
             
             FMTDubinsConnector conn = rt_fmt_planner.dubins_connector;
-            recalChildrenCost(x, S, conn, ownVel, oldSeedCost);
+            recalChildrenCost(x, S, conn, oldSeedCost);
             S.blocked[x] = false;
         }
     }
@@ -1222,7 +1169,7 @@ bool isEdgeFixedFree(int i, int j, FMTPlanner& rt_fmt_planner, const RTFMTPLanne
 
 
 // FUnction to expand the rt-fmt TREE:
-void expandTree(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs, const Eigen::VectorXd& ownVel) {
+void expandTree(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundle& act_obs) {
     // REfresh if the unvisited candidate nodes are not in XNear:
     if (!S.unvis.empty() && S.XNear.empty() && S.z != -1) {
         auto N_z_pair = near(S.V, S.waypoint_location, S.V[S.z], S.rn, S.w1, S.w2);
@@ -1246,7 +1193,7 @@ void expandTree(FMTPlanner& rt_fmt_planner, RTFMTPLannerState& S, const FMTBundl
         std::vector<int> YNear = nearStates(x, targetStates, S);
 
         // Get the best parent
-        auto [yMin, yCost, isCFixed] = selectBestParent(x, YNear, rt_fmt_planner, S, act_obs, ownVel);
+        auto [yMin, yCost, isCFixed] = selectBestParent(x, YNear, rt_fmt_planner, S, act_obs);
 
         if (yMin != -1 && isCFixed) {
             bool isCNodeOK = !S.dynamicObstructed[x];
@@ -1488,23 +1435,23 @@ PathResult generatePath(RTFMTPLannerState& S){
 
 
 // FUnction that works every iteration:
-RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eigen::VectorXd& currPose,  const Eigen::VectorXd& ownVel) {
+RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eigen::VectorXd& currPose) {
     // Start by updating the Obstacles to block or unblock nodes:
-    RTFMTPLannerState S = updateObstructedNodes(rt_fmt_planner, act_obs, ownVel);
+    RTFMTPLannerState S = updateObstructedNodes(rt_fmt_planner, act_obs);
     rt_fmt_planner.ft_fmt_mask = S;
 
     //  Update the root of the tree to the current UAV pose
     if (currPose.size() > 0) {
-        setCurrentPose(currPose, rt_fmt_planner, act_obs, ownVel);
+        setCurrentPose(currPose, rt_fmt_planner, act_obs);
     }
     S = rt_fmt_planner.ft_fmt_mask;
 
     // Run the expansion loop based on expandTreeRate:
     int nSteps =  static_cast<int>(S.expandTreeRate);
     for (int ii = 0; ii < nSteps; ++ii){
-        rewireLocally(rt_fmt_planner, S, act_obs, ownVel);
-        expandTree(rt_fmt_planner, S, act_obs, ownVel);
-        rewireFromRoot2(rt_fmt_planner, S, act_obs, ownVel);
+        rewireLocally(rt_fmt_planner, S, act_obs);
+        expandTree(rt_fmt_planner, S, act_obs);
+        rewireFromRoot2(rt_fmt_planner, S, act_obs);
     }
 
     // sAVE THE EDGE LIST:
@@ -1536,10 +1483,6 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
     const double own_course = own_state.course;
     const double own_vel_a = std::sqrt(own_vn*own_vn + own_ve*own_ve + own_vu*own_vu);
 
-    // Define the current unitary velocty vector:
-    Eigen::VectorXd own_vel(3); 
-    own_vel << own_vn, own_ve, -own_vu;
-
     // Identify it there is an obstacle neart the next waypoints:
     FMTBundle active_obs = FMT_Detect(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, crit_time, min_radius);
 
@@ -1554,7 +1497,7 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
 
     // If there ir any obstacle do a tick to make it continue:
     auto start_time = std::chrono::high_resolution_clock::now();
-    RTFMTPLannerState current_state = tick(rt_fmt_planner, active_obs, current_pose, own_vel);
+    RTFMTPLannerState current_state = tick(rt_fmt_planner, active_obs, current_pose);
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = end_time - start_time;
     std::cout << "[RT-FMT] Tick (" << rt_fmt_planner.ft_fmt_mask.expandTreeRate << " steps) took: " 
@@ -1573,22 +1516,9 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
         }
 
         // Append the path created by the FMT:
-        for (size_t i = 0; i < current_path.waypoints.size(); i++){
-            for (size_t i = 0; i < current_path.waypoints.size() - 1; i++){
-                double s1[4] = {current_path.waypoints[i](0), current_path.waypoints[i](1), current_path.waypoints[i](2), current_path.waypoints[i](3)};
-                double s2[4] = {current_path.waypoints[i+1](0), current_path.waypoints[i+1](1), current_path.waypoints[i+1](2), current_path.waypoints[i+1](3)};
-                
-                // Ask interDubins for the exact curved path
-                DubinsInterpResult segment = interDubins(rt_fmt_planner.dubins_connector, s1, s2, 0.0, true);
-                
-                for (const auto& pt : segment.intposes) {
-                    // Avoid adding duplicate overlapping points
-                    if (updated_waypoints.empty() || (updated_waypoints.back() - pt.head(3)).norm() > 1.0) {
-                        updated_waypoints.push_back(pt.head(3));
-                        updated_cmd_vel.push_back(own_vel_a);
-                    }
-                }
-            }
+        for (size_t i = 1; i < current_path.waypoints.size(); i++){
+            updated_waypoints.push_back(current_path.waypoints[i].head(3));
+            updated_cmd_vel.push_back(own_vel_a);
         }
 
         // Ensure the las point is the goal:

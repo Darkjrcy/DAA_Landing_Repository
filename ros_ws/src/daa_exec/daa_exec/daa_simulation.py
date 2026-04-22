@@ -398,7 +398,7 @@ class DAASimulation(Node):
         alt_all = np.concatenate(alt_points)
         max_range_north = (np.ptp(e_all) + 1000)/ 2.0
         max_range_east = (np.ptp(n_all) + 1000) / 2.0
-        max_range_alt = (np.ptp(alt_all) + 1000) / 2.0
+        max_range_alt = (np.ptp(alt_all) + 4000) / 2.0
         mid_x = np.mean(e_all)
         mid_y = np.mean(n_all)
         mid_z = np.mean(alt_all)

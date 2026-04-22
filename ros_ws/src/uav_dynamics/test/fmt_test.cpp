@@ -20,16 +20,16 @@ int main() {
 
     // RT-FMT planner parameters:
     FMTPlanner rt_fmt_planner;
-    rt_fmt_planner.rt_fmt_opts.N = 100;              
+    rt_fmt_planner.rt_fmt_opts.N = 1000;              
     
-    rt_fmt_planner.rt_fmt_opts.w1 = 0.5;  
-    rt_fmt_planner.rt_fmt_opts.w2 = 0.25;
+    rt_fmt_planner.rt_fmt_opts.w1 = 10.0;  
+    rt_fmt_planner.rt_fmt_opts.w2 = 1.0;
     rt_fmt_planner.rt_fmt_opts.expandTreeRate = 20.0; 
     rt_fmt_planner.rt_fmt_opts.goal_radius = 5.0; 
     rt_fmt_planner.rt_fmt_opts.safeRadiusDObstacle = 5.0;
 
     // SImple UAV parameters used for the dubins paths:
-    double rn = 35.0; 
+    double rn = 25.0; 
     double max_roll = 0.5;
     double air_speed = 15.0;
     double fpa_limits[2] = {-0.2, 0.2};
