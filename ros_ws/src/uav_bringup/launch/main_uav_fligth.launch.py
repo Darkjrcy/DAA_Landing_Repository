@@ -71,7 +71,7 @@ def launch(context, *args, **kwargs):
     robot_scale = ["0.7", "0.7", "0.7"]
     camera_num = ["1.0", "0.0", "0.0"]
     # Launch arguments for the world:
-    world = "Riobamba.sdf"
+    world = "BigBen.sdf"
     world_name = get_world_name(world)
     # Fog characteristis:
     fog_lifetime="10.0"

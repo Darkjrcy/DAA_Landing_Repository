@@ -1,5 +1,5 @@
 <sdf version='1.10'>
-        <world name='ERAU'>
+        <world name='BigBen'>
             <physics name='1ms' type='dart'>
             <max_step_size>0.005</max_step_size>
             <real_time_factor>1</real_time_factor>
@@ -19,14 +19,14 @@
             <shadows>true</shadows>
             </scene>
             <plugin name='gz::sim::systems::Sensors' filename='gz-sim-sensors-system'/>
-            <model name='ERAU'>
+            <model name='BigBen'>
             <pose>-0.91324664962335245 0.36039607076443403 0 0 0 0</pose>
             <static>true</static>
             <link name='city'>
                 <visual name='visual'>
                 <geometry>
                     <mesh>
-                    <uri>model://ERAU/ERAU.gltf</uri>
+                    <uri>model://BigBen/BigBen.gltf</uri>
                     </mesh>
                 </geometry>
                 <pose>0 0 0 0 0 0</pose>
@@ -34,7 +34,7 @@
                 <collision name='collision'>
                 <geometry>
                     <mesh>
-                    <uri>model://ERAU/ERAU.gltf</uri>
+                    <uri>model://BigBen/BigBen.gltf</uri>
                     </mesh>
                 </geometry>
                 <pose>0 0 0 0 0 0</pose>

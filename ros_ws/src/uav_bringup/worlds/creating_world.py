@@ -3,10 +3,26 @@ import math
 import os
 import time
 import urllib.request
-import urllib.parse
-import mathutils
-import json
 from pathlib import Path
+import math
+import sys
+import site
+import numpy as np
+import subprocess
+
+# Install cv2 in the blender environment:
+try:
+    import cv2
+    import numpy as np
+except ModuleNotFoundError:
+    print("OpenCV/Numpy missing. Installing them into Blender's Python environment now...")
+    subprocess.check_call([sys.executable, "-m", "ensurepip"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "opencv-python", "numpy"])
+    sys.path.append(site.getusersitepackages())
+    
+    # Import them after successful installation
+    import cv2
+    import numpy as np
 
 # Define the folder path worlds and meshes
 ACT_FOLDER     = Path(__file__).resolve().parent 
@@ -67,30 +83,86 @@ def clear_scene():
 
 
 
+# Function to calcaulte the area between geogrohical cooridnates:
+def calculate_bbox_are(min_lat, max_lat, min_lon, max_lon):
+    R = 6371.0
+    # TRanform the angles to radians:
+    phi1, phi2 = min_lat / 57.3, max_lat /57.3
+    lambda1, lambda2 = min_lon / 57.3, max_lon /57.3
+
+    # Calaculate the area:
+    area = (R**2) * abs(math.sin(phi2) - math.sin(phi1)) * abs(lambda2 - lambda1)
+    
+    return area
+
+
 # DOwnload mapbox image:
 def download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, save_path):
-    # Incrase the image by 50% as it tooks some houses that are near the limits:
-    lat_cen = (img_max_lat + img_min_lat) / 2
-    lon_diff = img_max_lon - img_min_lon
-    lat_diff = img_max_lat - img_min_lat
-    aspect_ratio = (lon_diff * math.cos(math.radians(lat_cen))) / lat_diff
-    
-    # Make the aspect ratio the best resulition
-    if aspect_ratio >= 1:
-        w, h = 1280, int(1280 / aspect_ratio)
-    else:
-        w, h = int(1280 * aspect_ratio), 1280
-        
-    # DOwbnlaod the image from Mapbox:
-    url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/%5B{img_min_lon},{img_min_lat},{img_max_lon},{img_max_lat}%5D/{w}x{h}@2x?access_token={MAPBOX_TOKEN}"
-    try:
-        urllib.request.urlretrieve(url, save_path)
-        print("Image Download Successful!")
-        return True
-    except Exception as e:
-        print(f"Image Download Failed: {e}")
-        return False
+    # Get the number of grids using the area:
+    area = calculate_bbox_are(img_min_lat, img_max_lat, img_min_lon, img_max_lon)
+    grid_size = math.ceil(math.sqrt(area / 0.5))
+    # Define the grid step:
+    lat_step = (img_max_lat - img_min_lat) / grid_size
+    lon_step = (img_max_lon - img_min_lon) / grid_size
 
+    # Create the individual images:
+    tile_paths = []
+    for row in range(grid_size):
+        # Divide it in rows:
+        row_files = []
+        tile_max_lat = img_max_lat - (row * lat_step)
+        tile_min_lat = tile_max_lat - lat_step
+        # Ge teh colum image of that row:
+        for col in range(grid_size):
+            tile_min_lon = img_min_lon + (col * lon_step)
+            tile_max_lon = tile_min_lon + lon_step
+
+            # Calculate the aspect ratio for this specific small tile
+            lat_cen = (tile_max_lat + tile_min_lat) / 2
+            lon_diff = tile_max_lon - tile_min_lon
+            lat_diff = tile_max_lat - tile_min_lat
+            aspect_ratio = (lon_diff * math.cos(math.radians(lat_cen))) / lat_diff
+
+            # Max the MAPBOX limits for the satellite images:
+            if aspect_ratio >= 1:
+                w, h = 1280, int(1280 / aspect_ratio)
+            else:
+                w, h = int(1280 * aspect_ratio), 1280 
+            url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/[{tile_min_lon},{tile_min_lat},{tile_max_lon},{tile_max_lat}]/{w}x{h}@2x?access_token={MAPBOX_TOKEN}"
+
+            # Save the file temporarly:
+            temp_path = str(ACT_FOLDER / f"temp_tile_{row}_{col}.jpg")
+            try:
+                urllib.request.urlretrieve(url, temp_path)
+                row_files.append(temp_path)
+            except Exception as e:
+                print(f"Failed to download tile {row},{col}: {e}")
+                return False
+                
+        tile_paths.append(row_files)
+
+    # Stitch with OPenCV:
+    rows_stitched = []
+    for row_imgs in tile_paths:
+        imgs = [cv2.imread(img) for img in row_imgs]
+        target_h = imgs[0].shape[0]
+        imgs_resized = [cv2.resize(img, (img.shape[1], target_h)) for img in imgs]
+        h_concat = cv2.hconcat(imgs_resized)
+        rows_stitched.append(h_concat)
+    
+    # Force the rows to have the same width:
+    target_w = rows_stitched[0].shape[1]
+    rows_resized = [cv2.resize(row, (target_w, row.shape[0])) for row in rows_stitched]
+    final_image = cv2.vconcat(rows_resized)
+    cv2.imwrite(str(save_path), final_image)
+
+    # ELiminate teh images after they are used:
+    for row in tile_paths:
+        for p in row:
+            if os.path.exists(p):
+                os.remove(p)
+    
+    return True
 
 
 # Download osm file:
@@ -528,18 +600,18 @@ def generate_world_file(name, worlds_folder):
 
 ################################## MAIN CODE #######################################
 # Define the characteristcs:
-lon_cen = -78.64
-lat_cen = -1.65335
+lat_cen = 51.500833
+lon_cen = -0.123231
 
 # Define the area lengths in mi:
-lon_length = 1.5
-lat_length = 1
+lon_length = 0.5
+lat_length = 0.5
 
 # Deifne teh plugin version (free or pro):
 blosm_ver = "pro"
 
 # Define the anme of the mesh file and world:
-name = "Riobamba"
+name = "BigBen"
 folder_name = (MODELS_FOLDER / name)
 
 
