@@ -18,3 +18,8 @@ ros_ws/src/uav_dynamics/src/matlab_obj/*
 
 # Ignore the keys used for some creation:
 ros_ws/src/uav_bringup/config/world_creation.yaml
+
+# Ignore the folder with the encouters as is too heavy:
+# Use a wildcard to catch this file regardless of path depth
+**/encounter_data/*.csv
+**/encounter_data/terminal_encounter_state_data_20200630/

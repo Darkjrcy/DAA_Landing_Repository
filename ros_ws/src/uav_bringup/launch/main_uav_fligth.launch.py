@@ -82,7 +82,7 @@ def launch(context, *args, **kwargs):
     # Define the trajectories the UAVs have to follow (N,E,D RF and x_velocity):
     trajectories = [
         # UAV 1 (EX: 2 Trajectories):
-        "2000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 11000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90"
+        "-3000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 11000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90"
         " % "
         "4000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 12000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90",
         # UAV 2 (EX: 2 tRAJECTORIES)
@@ -95,9 +95,9 @@ def launch(context, *args, **kwargs):
         "10000, -4800, -300, 80; 9867, -3278, -290, 85; 9679, -834, -280, 85; 9415, 2595, -250, 90; 9241, 4855, -240, 90; 9000, 8000, -230, 90",
     ]
     # Define which of the UAVs have aviodance:
-    has_avoidance = [True, False, False]
+    has_avoidance = [True, True, False]
     # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
-    type_avoidance = ["FMT", "NONE", "NONE"]
+    type_avoidance = ["GEOMETRIC", "GEOMETRIC", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################

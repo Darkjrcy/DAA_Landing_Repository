@@ -55,7 +55,9 @@ install(
   worlds
   models
   config
+  encounter_data
   DESTINATION share/${PROJECT_NAME}/
+  PATTERN "encounter_data/terminal_encounter_state_data_20200630" EXCLUDE
 )
 
 ament_package()

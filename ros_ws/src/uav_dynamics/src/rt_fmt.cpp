@@ -379,7 +379,7 @@ FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles,
         
         // Calculate dynamic avoidance radius (dm)
         const double obs_velocity_a = std::sqrt(obs.v_north*obs.v_north + obs.v_east*obs.v_east + obs.v_up*obs.v_up);
-        const double dm = 1.5 * (obs_velocity_a * 1.0 + 125.0 + 1.5 * 6.0 + 1.0 * own_vel_a);
+        const double dm = 1.5 * (obs_velocity_a * 1.0 + 500.0 + 1.5 * 6.0 + 1.0 * own_vel_a);
         const std::string &id = moving_obstacles.obstacles_id[i];
 
         const double search_radius = 1.25 * (dm + min_radius + crit_time * own_vel_a);

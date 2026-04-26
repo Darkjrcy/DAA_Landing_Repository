@@ -65,7 +65,7 @@ FCABundle FCA_Detect(const uav_dynamics::msg::AvoidanceStates &intruders,double 
         // Open the data of each intruder:
         const auto &intr = intruders.intruder_states[i];
         const double int_velocity_a = std::sqrt(intr.v_north*intr.v_north + intr.v_east*intr.v_east + intr.v_up*intr.v_up);
-        const double dm = 1.5*(int_velocity_a*1.0+125+1.5*6+1.0*own_vel_a);
+        const double dm = 1.5*(int_velocity_a*1.5+500+1.5*6+1.5*own_vel_a);
         const std::string &id = intruders.obstacles_id[i];
 
         // relative position and velocity:
