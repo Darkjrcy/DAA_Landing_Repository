@@ -247,9 +247,16 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     if (min_crit_time > crit_time) return;
 
     // Start the avoidance in case it is lower than the critical time:
+    double speed = act_vel.norm();
+    if (speed < 1.0) speed = 1.0;
+
+    // Get the lookeahed fdistance and the trasnition radius
+    const double max_bank_angle = 15.0 * M_PI / 180.0;
+    const double gravity = 9.81;
+    double min_turn_radius = (speed * speed) / (gravity * std::tan(max_bank_angle));
+    nav_state.transition_radius = std::max(250.0, min_turn_radius * 1.2);
+    nav_state.look_ahead_distance = std::max(100.0, speed * 5.0); 
     nav_state.start_the_avoidance = true;
-    nav_state.transition_radius = 200;
-    nav_state.look_ahead_distance = 150;
 
     // Modify the waypoints:
     // Identify the actual avoidance obstacle characteristics:

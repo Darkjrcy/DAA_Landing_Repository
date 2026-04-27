@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import pandas as pd
 import random
 import math
@@ -23,7 +24,7 @@ def get_world_name(world):
 
 
 # Generate t arandom position to spawn the uavs and don't overlap:
-def generate_random_position(n, min_dist, x_range = (-100, 100), y_range = (-50, 50), z_range= (4, 50)):
+def generate_random_position(n, min_dist, x_range = (-100, 100), y_range = (-50, 50), z_range= (40, 100)):
     positions = []
     attemps = 0
     max_iter = 1000
@@ -55,6 +56,8 @@ def launch(context, *args, **kwargs):
     # Define the packages:
     # Package of the launch files and launch tools:
     pkg_bringup = "uav_bringup"
+    # Deifne the isntallation directory:
+    install_dir = get_package_share_directory(pkg_bringup)
     # DAA simulation logic and tools used for opening and closing the simulation
     pkg_daa_sim = "daa_exec"
 
@@ -63,13 +66,13 @@ def launch(context, *args, **kwargs):
 
     # Launch Arguments for Spawning:
     # Type of the UAVs (fixed_wing, vtol):
-    type_uav = ["fixed_wing", "fixed_wing", "fixed_wing"]
+    type_uav = ["fixed_wing", "fixed_wing"]
     # Launch airplane arguments:
-    robot_names = ["airplane_1", "airplane_2", "airplane_3"]
+    robot_names = ["airplane_1", "airplane_2"]
     # Create the spawning positions randomlly:
     spawn_coords = generate_random_position(len(robot_names), min_dist= 15.0)
-    robot_scale = ["0.7", "0.7", "0.7"]
-    camera_num = ["1.0", "0.0", "0.0"]
+    robot_scale = ["0.7", "0.7"]
+    camera_num = ["1.0", "0.0"]
     # Launch arguments for the world:
     world = "BigBen.sdf"
     world_name = get_world_name(world)
@@ -79,30 +82,41 @@ def launch(context, *args, **kwargs):
     enable_fog="false"
     
     ######################## IMportant charcateristics for hte DAA simulation ######################################
-    # Define the trajectories the UAVs have to follow (N,E,D RF and x_velocity):
+    # # Define the trajectories the UAVs have to follow (N,E,D RF and x_velocity):
+    # trajectories = [
+    #     # UAV 1 (EX: 2 Trajectories):
+    #     "-3000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 11000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90"
+    #     " % "
+    #     "4000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 12000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90",
+    #     # UAV 2 (EX: 2 tRAJECTORIES)
+    #     "7800, 0, -300, 80; 7600, 0, -300, 80; 6400, 0, -300, 80; 5200, 0, -300, 80; 4000, 0, -300, 80; 1000, 0, -300, 80; -800, 0, -300, 80"
+    #     " % "
+    #     "6150, 1230, -300, 50; 7739, 1230, -300, 50; 9476, 1230, -300, 50; 11178, 1230, -300, 50; 12616, 1230, -300, 50; 14000, 1230, -300, 50",
+    #     # UAV 3 (EX: 2 tRAJECTORIES)
+    #     "9000, 4800, -325, 80; 9000, -1284, -325, 80; 9000, -3443, -325, 80; 9000, -6000, -325, 80; 9000, -8608, -325, 80; 9000, -11000, -325, 80"
+    #     " % "
+    #     "10000, -4800, -300, 80; 9867, -3278, -290, 85; 9679, -834, -280, 85; 9415, 2595, -250, 90; 9241, 4855, -240, 90; 9000, 8000, -230, 90",
+    # ]
+
+    # MIT Defined trejcteries:
+    trajectory_info = os.path.join(install_dir, "encounter_data/test_trajectories/case_2uavs.json")
+    # OPen the json file:
+    with open(trajectory_info, 'r') as file:
+        trajectory_dict = json.load(file)
+    
     trajectories = [
         # UAV 1 (EX: 2 Trajectories):
-        "-3000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 11000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90"
-        " % "
-        "4000, 0, -280, 80; 5200, 0, -300, 85; 6400, 0, -310, 90; 7600, 0, -320, 90; 8800, 0, -325, 90; 9200, 0, -325, 90; 10000, 0, -325, 90; 12000, 0, -325, 90; 14000, 0, -325, 90; 16000, 0, -340, 90",
-        # UAV 2 (EX: 2 tRAJECTORIES)
-        "7800, 0, -300, 80; 7600, 0, -300, 80; 6400, 0, -300, 80; 5200, 0, -300, 80; 4000, 0, -300, 80; 1000, 0, -300, 80; -800, 0, -300, 80"
-        " % "
-        "6150, 1230, -300, 50; 7739, 1230, -300, 50; 9476, 1230, -300, 50; 11178, 1230, -300, 50; 12616, 1230, -300, 50; 14000, 1230, -300, 50",
-        # UAV 3 (EX: 2 tRAJECTORIES)
-        "9000, 4800, -325, 80; 9000, -1284, -325, 80; 9000, -3443, -325, 80; 9000, -6000, -325, 80; 9000, -8608, -325, 80; 9000, -11000, -325, 80"
-        " % "
-        "10000, -4800, -300, 80; 9867, -3278, -290, 85; 9679, -834, -280, 85; 9415, 2595, -250, 90; 9241, 4855, -240, 90; 9000, 8000, -230, 90",
+        trajectory_dict["uav_1"],
+        trajectory_dict["uav_2"],
     ]
+
     # Define which of the UAVs have aviodance:
-    has_avoidance = [True, True, False]
+    has_avoidance = [False, False]
     # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
-    type_avoidance = ["GEOMETRIC", "GEOMETRIC", "NONE"]
+    type_avoidance = ["NONE", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################
-    # Deifne the isntallation directory:
-    install_dir = get_package_share_directory(pkg_bringup)
     # Root:
     ws_root = os.path.abspath(os.path.join(install_dir, '../../../../'))
     # Deifne the main directory:

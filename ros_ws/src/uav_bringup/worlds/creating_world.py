@@ -604,8 +604,8 @@ lat_cen = 51.500833
 lon_cen = -0.123231
 
 # Define the area lengths in mi:
-lon_length = 0.5
-lat_length = 0.5
+lon_length = 2.0
+lat_length = 2.0
 
 # Deifne teh plugin version (free or pro):
 blosm_ver = "pro"

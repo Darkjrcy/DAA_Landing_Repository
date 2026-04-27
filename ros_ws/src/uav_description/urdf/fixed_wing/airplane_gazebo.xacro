@@ -106,7 +106,7 @@
                 <topic>/world/${world_name}/model/${robot_name}/link/base_link/sensor/lidar_link/scan/points</topic> <!-- Must match the GPU LiDAR topic published by Gazebo -->
                 <frame_id>${robot_name}/base_link/lidar_link</frame_id>
                 <disableNoise>0</disableNoise>
-                <pub_ros2>0</pub_ros2>
+                <pub_ros2>1</pub_ros2>
                 <origin_latitude>42.47</origin_latitude> 
                 <origin_longitude>-71.28</origin_longitude>
                 <origin_altitude>0</origin_altitude>

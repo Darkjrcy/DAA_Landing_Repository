@@ -133,8 +133,8 @@ class FixedWingDynamics : public rclcpp::Node{
         std::vector<double> cmd_vel_;
 
         // Define the vraibles of the Waypoint follower to see the next position:
-        double transition_radius_ = 420;
-        double look_ahead_distance_ = 250;
+        double transition_radius_;
+        double look_ahead_distance_;
 
         // Define the avoider current state:
         gnss_multipath_plugin::msg::StatesInfo avoider_current_state_;
@@ -424,7 +424,7 @@ class FixedWingDynamics : public rclcpp::Node{
         Eigen::VectorXd FixedWingLogic(const Eigen::VectorXd &state, double vel_cmd, double course_cmd, double alt_cmd){
             // Define the constant values
             const double g = 9.81;   // gravity
-            const double kp_V = 6.7; // proportional gain of the velocity
+            const double kp_V = 0.3; // proportional gain of the velocity
             const double kp_roll = 2.5; //proportional gain of the roll
             const double kd_roll = 0.8; //derivatice gain of the roll
             const double kp_Y = 0.25; // proportional gain of the course
@@ -460,6 +460,7 @@ class FixedWingDynamics : public rclcpp::Node{
             dstate(5) = kp_V * (vel_cmd - V);
             dstate(6) = state(7);
             dstate(7) = kp_roll * (roll_cmd - state(6)) - kd_roll * state(7);
+            
             return dstate;
         }
 
@@ -501,6 +502,15 @@ class FixedWingDynamics : public rclcpp::Node{
             // Define a vector as the actual state:
             Eigen::VectorXd actual_state(8);
             actual_state << msg->north, msg->east, msg->up, msg->course, msg-> fpa, velocity_a, msg-> roll, msg->p;
+
+            // Calacualte the lookahed aditsnte and the transitionr adius:
+            double current_speed = std::max(velocity_a, 1.0);
+            double current_min_radius = (current_speed * current_speed) / (std::tan(max_roll_) * 9.81);
+            if (!start_the_avoidance) {
+                transition_radius_ = std::max(250.0, current_min_radius * 1.5); 
+                look_ahead_distance_ = std::max(100.0, current_speed * 0.5); 
+            }
+
             // USe the Waypoint follower to obtain teh next waypoint to follow:
             NextGoalInformation next_goal = WaypointFollower(actual_pose, waypoints_, look_ahead_distance_, current_idx, transition_radius_);
             // Update the index:
@@ -579,11 +589,8 @@ class FixedWingDynamics : public rclcpp::Node{
             } else {
                 goal_reached_ = false;
                 // Send the required velcoity command:
-                double com_linear_vel = std::sqrt(std::max(0.0,
-                    actual_dstates(0)*actual_dstates(0)+
-                    actual_dstates(1)*actual_dstates(1)+
-                    actual_dstates(2)*actual_dstates(2)));
-                com_linear_vel = std::clamp(com_linear_vel, 5.0, 420.0);
+                double com_linear_vel = std::clamp(vel_cmd, 5.0, 420.0);
+                cmd_velocity.linear.x = com_linear_vel;
                 cmd_velocity.linear.x = com_linear_vel;
                 cmd_velocity.angular.x = actual_dstates(7);
                 cmd_velocity.angular.y = -actual_dstates(4);
