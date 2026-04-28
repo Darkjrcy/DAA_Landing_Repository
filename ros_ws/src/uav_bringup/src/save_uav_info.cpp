@@ -3,7 +3,10 @@
 // Include ROS2 message:
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include "gnss_multipath_plugin/msg/states_info.hpp"
+#include "uav_dynamics/msg/intruders_status.hpp"
+#include "uav_dynamics/msg/intruder_flag.hpp"
 #include "rosgraph_msgs/msg/clock.hpp"
 // C++ libraries:
 #include <iostream>
@@ -51,13 +54,27 @@ struct Adsb_unit {
 
 };
 
+// Create a structure to save the infroamtion ralted to the avoidance:
+struct avoidance_info_unit
+{
+    double sim_time;
+    double real_time;
+
+    // The intruders names wiht the boolean saying if they are insie the avoidance radius
+    std::vector<uav_dynamics::msg::IntruderFlag> states;
+    
+    // Is the system avoidance:
+    int is_avoiding;
+};
+
+
 
 
 // Generate the class of the executable:
 class SaveUAVInfo : public rclcpp::Node{
     public:
-        SaveUAVInfo(const std::vector<std::string> &model_names, const std::string &save_dir) 
-        : rclcpp::Node("save_info_node"), model_names_(model_names), save_dir_(save_dir){
+        SaveUAVInfo(const std::vector<std::string> &model_names, const std::map<std::string, bool> &is_avoider_map, const std::string &save_dir, const bool avoidance_analysis) 
+        : rclcpp::Node("save_info_node"), model_names_(model_names), save_dir_(save_dir), is_avoider_map_(is_avoider_map), avoidance_analysis_(avoidance_analysis){
             // Declare the topic parameters:
             std::string mission_start_topic = "/mission_starts";
             std::string traj_complete_topic = "/traj_complete";
@@ -111,6 +128,38 @@ class SaveUAVInfo : public rclcpp::Node{
                         last_adsb_states_[name] = *msg;
                     }
                 );
+
+                // First lets see if the user require and avoidance analysis:
+                if (avoidance_analysis_){
+                    // Identify the avoiders:
+                    if (is_avoider_map_[name]) {
+                        // oBTAIN THE TOPIC with teh inforamtin showing if it is in the avoidance zone:
+                        std::string intruder_avoidance_topic = name + "/is_inside_avo";
+                        std::string is_avoiding_topic = name + "/is_avoiding";
+
+                        // Create histories for every avoider:
+                        avoidance_histories_[name] = std::vector<avoidance_info_unit>();
+
+                        // Create Intruder Status subscriber
+                        intruders_info_subs_[name] = this->create_subscription<uav_dynamics::msg::IntrudersStatus>(
+                            intruder_avoidance_topic, 10,
+                            [this, name](const uav_dynamics::msg::IntrudersStatus::SharedPtr msg) {
+                                std::lock_guard<std::mutex> lock(mutex_);
+                                last_intruders_states_[name] = *msg;
+                            }
+                        );
+
+                        // Create the subscriber ot see if the avoider is active:
+                        avoiding_subs_[name] = this->create_subscription<std_msgs::msg::Int32>(
+                            is_avoiding_topic, 10,
+                            [this, name](const std_msgs::msg::Int32::SharedPtr msg) {
+                                std::lock_guard<std::mutex> lock(mutex_);
+                                last_avoiding_states_[name] = *msg;
+                            }
+                        );
+
+                    }
+                }
             }
 
             // Create the timer to save the information:
@@ -142,20 +191,31 @@ class SaveUAVInfo : public rclcpp::Node{
         std::map<std::string, std::optional<nav_msgs::msg::Odometry>> last_uav_states_;
         // Last ADS-Bs states:
         std::map<std::string, std::optional<gnss_multipath_plugin::msg::StatesInfo>> last_adsb_states_;
+        // Last states fo teh avoidance:
+        std::map<std::string, std::optional<uav_dynamics::msg::IntrudersStatus>> last_intruders_states_;
+        std::map<std::string, std::optional<std_msgs::msg::Int32>> last_avoiding_states_;
 
         // Maps to hold the historical data for each UAV
         std::map<std::string, std::vector<Odom_unit>> odom_histories_;
         std::map<std::string, std::vector<Adsb_unit>> adsb_histories_;
+        std::map<std::string, std::vector<avoidance_info_unit>> avoidance_histories_;
 
 
         // Define the subscribers in ROS2:
         std::map<std::string, rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> states_subs_;
         std::map<std::string, rclcpp::Subscription<gnss_multipath_plugin::msg::StatesInfo>::SharedPtr> adsb_subs_;
+        std::map<std::string, rclcpp::Subscription<uav_dynamics::msg::IntrudersStatus>::SharedPtr> intruders_info_subs_;
+        std::map<std::string, rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr> avoiding_subs_;
         rclcpp::Subscription<rosgraph_msgs::msg::Clock>::SharedPtr clock_cub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr start_recording_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr trajectory_complete_sub_;
         // Define the saving timer:
         rclcpp::TimerBase::SharedPtr timer_;
+
+        // Variable to see if the airplanes are avoiders:
+        std::map<std::string, bool> is_avoider_map_;
+        // Permit the avoidance anylsis saving files:
+        bool avoidance_analysis_;
 
 
 
@@ -192,6 +252,7 @@ class SaveUAVInfo : public rclcpp::Node{
                 for (const auto& name : model_names_) {
                     odom_histories_[name].clear();
                     adsb_histories_[name].clear();
+                    avoidance_histories_[name].clear();
                 }
             }
         }
@@ -272,6 +333,23 @@ class SaveUAVInfo : public rclcpp::Node{
                     adsb_unity.r = adsb.r;
                     adsb_histories_[name].push_back(adsb_unity);
                 }
+
+                // Save teh avoiders info in teh history:
+                if (avoidance_analysis_ && is_avoider_map_[name]){
+                    if (last_intruders_states_[name].has_value() && last_avoiding_states_[name].has_value()) {
+                        auto intruders_msg = last_intruders_states_[name].value();
+                        auto avoiding_msg = last_avoiding_states_[name].value();
+
+                        // Create one avoidance info structure:
+                        avoidance_info_unit avo_unit;
+                        avo_unit.sim_time = sim_time_ - sim_time_0_;
+                        avo_unit.real_time = current_real_time - real_time_0_;
+                        avo_unit.states = intruders_msg.states;
+                        avo_unit.is_avoiding = avoiding_msg.data; 
+                        avoidance_histories_[name].push_back(avo_unit);
+                    }
+                }
+
             }
         }
 
@@ -325,6 +403,44 @@ class SaveUAVInfo : public rclcpp::Node{
                 } else {
                     RCLCPP_ERROR(this->get_logger(), "Failed to open file %s for writing.", save_filename.c_str());
                 }
+
+                // Save teh avoidance analysis if its necesary:
+                if (avoidance_analysis_ && is_avoider_map_[name]){
+                    // Check if there is avoidance history to save:
+                    if (!avoidance_histories_[name].empty()) {
+                        // FIle name pf the avoidance info:
+                        std::string save_avo_filename = save_dir_ + "/" + name + "_avoidance_info.csv";
+                        std::ofstream avo_file(save_avo_filename);
+
+                        // Record the data inside the csv file:
+                        if (avo_file.is_open()) {
+                            // Create teh headers
+                            avo_file  << "sim_time,real_time";
+                            // CReate each of the obstacles:
+                            const auto& first_record = avoidance_histories_[name][0];
+                            for (size_t j = 0; j < first_record.states.size(); ++j) {
+                                avo_file << "," << first_record.states[j].obstacle_id;
+                            }
+                            // Header with teh boolean to se if the avoider is active:
+                            avo_file << ",avoidance_started\n";
+
+                            // Write teh avoidance info data:
+                            for (const auto& avo_data : avoidance_histories_[name]) {
+                                avo_file << avo_data.sim_time << "," << avo_data.real_time;
+                                for (const auto& intruder : avo_data.states) {
+                                    avo_file << "," << (intruder.is_inside ? 1 : 0); 
+                                }
+                                avo_file << "," << avo_data.is_avoiding << "\n";
+                            }
+                            
+                            // Close the file:
+                            avo_file.close();
+                            RCLCPP_INFO(this->get_logger(), "Successfully saved avoidance data for %s", name.c_str());
+                        } else {
+                            RCLCPP_ERROR(this->get_logger(), "Failed to open avoidance file %s for writing.", save_avo_filename.c_str());
+                        }
+                    }
+                }
             }
         }
 };
@@ -337,20 +453,37 @@ int main(int argc, char **argv) {
     // Start the ROS2 node:
     rclcpp::init(argc, argv);
     // Obtain the arguments:
-    std::vector<std::string> model_names = {"airplane_1"};
+    std::vector<std::string> model_names;
+    std::map<std::string, bool> is_avoider_map;
+    bool avoidance_analysis = false;
     std::string save_dir = "/home/jorge/DAA_Landing_Repository/ros_ws/src/uav_bringup/saving_data";
     if (argc > 2) {
         save_dir = argv[1];
+        avoidance_analysis = (std::stoi(argv[2]) != 0); 
         model_names.clear(); // Clear the default
-        for (int i = 2; i < argc; ++i) {
-            model_names.push_back(argv[i]);
+        for (int i = 3; i < argc; i+=2) {
+            std::string name = argv[i];
+            model_names.push_back(name);
+
+            // Default boolean:
+            bool is_avoider = false;
+            if (i + 1 < argc) {
+                std::string bool_str = argv[i+1];
+                if (bool_str == "true" || bool_str == "True" || bool_str == "1") {
+                    is_avoider = true;
+                }
+            }
+            is_avoider_map[name] = is_avoider;
         }
     } else if (argc == 2) {
         RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Only 1 argument provided. Usage: <save_dir> <model_1> <model_2> ...");
         save_dir = argv[1];
+    } else {
+        model_names.push_back("airplane_1");
+        is_avoider_map["airplane_1"] = true;
     }
     // Create the node class:
-    auto node = std::make_shared<SaveUAVInfo>(model_names, save_dir);
+    auto node = std::make_shared<SaveUAVInfo>(model_names, is_avoider_map, save_dir, avoidance_analysis);
     
     RCLCPP_INFO(node->get_logger(), "Centralized recording node started. Tracking %zu models.", model_names.size());
     

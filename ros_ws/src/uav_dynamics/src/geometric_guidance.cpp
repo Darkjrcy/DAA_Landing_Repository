@@ -416,9 +416,46 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
 
 
+// Function to individually check if the avoider goes inside any UAV:
+inline std::vector<std::pair<std::string, int>> Detect_intrusion(const uav_dynamics::msg::AvoidanceStates &intruders,double own_e, double own_n, double own_u,double own_ve, double own_vn, double own_vu){
+    // Obtain the number of intruders:
+    const size_t n = intruders.intruder_states.size();
+    // Define a vector that defines if it enters in avoidance zone:
+    std::vector<std::pair<std::string, int>> inside_zone;
+
+    // Loop between intruders:
+    for (size_t i = 0; i<n; i++){ 
+        // Own velocity norm:
+        const double own_vel_a = std::sqrt(own_vn*own_vn+own_ve*own_ve+own_vu*own_vu);
+        // Open the data of each intruder:
+        const auto &intr = intruders.intruder_states[i];
+        const double int_velocity_a = std::sqrt(intr.v_north*intr.v_north + intr.v_east*intr.v_east + intr.v_up*intr.v_up);
+        // Get the avoidance radius:
+        const double dm = (int_velocity_a*1.5+500+1.5*6+1.5*own_vel_a);
+
+        // See if the rel_position norm is smaller than teh avodiance reaidus:
+        Eigen::Vector3d rel_pos(intr.east - own_e,
+                                intr.north - own_n,
+                                intr.up - own_u);
+
+        // If its lower it means that is inside the avoidance region:
+        if ((rel_pos.norm() - dm) <= 0 ){
+            inside_zone.push_back({intruders.obstacles_id[i], 1});
+        } else {
+            inside_zone.push_back({intruders.obstacles_id[i], 0});
+        }
+    }
+
+    return inside_zone;
+
+}
+
+
+
 // RElaize the Geomtric AVoidance algorithm:
 void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacles, const gnss_multipath_plugin::msg::StatesInfo& own_state,
     double min_radius, double crit_time, NavigationState& nav_state){
+
         // Get the ownship data:
         const double own_e  = own_state.east;
         const double own_n  = own_state.north;
@@ -428,37 +465,39 @@ void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacl
         const double own_vu = own_state.v_up;
         const double own_course = own_state.course;
         const double own_fpa = own_state.fpa;
-
+          
         // Save its actual position and velocit of the ownship:
         Eigen::Vector3d actual_pose;
         actual_pose << own_e, own_n, own_u;
         Eigen::Vector3d actual_vel;
         actual_vel << own_ve, own_vn, own_vu;
+        
+        // Only do the avoidance if te avoidance didn't start:
+        if (!nav_state.start_the_avoidance){
 
-        // Identify the conflicts:
-        FCABundle active_conflicts = FCA_Detect(obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu);
+            // Identify the conflicts:
+            FCABundle active_conflicts = FCA_Detect(obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu);
 
-        // If there nor conflict return:
-        if (active_conflicts.conflicts == 0){
-            return;
-        }
+            // Obtain the future obstacles position:
+            std::vector<Eigen::Vector3d> Target_Next_pos = Estimate_target_next_position(active_conflicts,actual_pose,actual_vel, crit_time);
 
-        // Obtain the future obstacles position:
-        std::vector<Eigen::Vector3d> Target_Next_pos = Estimate_target_next_position(active_conflicts,actual_pose,actual_vel, crit_time);
+            //Use a variable the save the overall active obstacles:
+            FCABundle overall_obstacles;
 
-        //Use a variable the save the overall active obstacles:
-        FCABundle overall_obstacles;
+            // Overlap obstacle that near each other or inside the minimum radius threshold
+            if (active_conflicts.conflicts > 1){
+                overall_obstacles = Check_for_overalping(active_conflicts, own_e, own_n, own_u, own_ve, own_vn, own_vu);
+                Target_Next_pos = Estimate_target_next_position(overall_obstacles,actual_pose,actual_vel, crit_time);
+            } else {
+                overall_obstacles = active_conflicts;
+            }
 
-        // Overlap obstacle that near each other or inside the minimum radius threshold
-        if (active_conflicts.conflicts > 1){
-            overall_obstacles = Check_for_overalping(active_conflicts, own_e, own_n, own_u, own_ve, own_vn, own_vu);
-            Target_Next_pos = Estimate_target_next_position(overall_obstacles,actual_pose,actual_vel, crit_time);
+            // Calculate their critical avoidance time to generate the avoiance waypoints:
+            avoidance_waypoints(overall_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, own_course, own_fpa, 
+                Target_Next_pos, min_radius, crit_time, nav_state);
         } else {
-            overall_obstacles = active_conflicts;
+            // Analyze if at any time the avoider enters inside the obstacles:
+            nav_state.inside_avoidance = Detect_intrusion(obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu);
         }
-
-        // Calculate their critical avoidance time to generate the avoiance waypoints:
-        avoidance_waypoints(overall_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, own_course, own_fpa, 
-            Target_Next_pos, min_radius, crit_time, nav_state);
 
 }

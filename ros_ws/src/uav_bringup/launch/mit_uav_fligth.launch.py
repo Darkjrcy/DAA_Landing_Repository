@@ -113,7 +113,7 @@ def launch(context, *args, **kwargs):
     # Define which of the UAVs have aviodance:
     has_avoidance = [True, False]
     # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
-    type_avoidance = ["FMT", "NONE"]
+    type_avoidance = ["GEOMETRIC", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################
@@ -214,8 +214,8 @@ def launch(context, *args, **kwargs):
     # Create the daa main programm that launches all the uav dynamics, trajectories and saving data nodes:
     daa_sim = Node(
         package= pkg_daa_sim,
-        executable='daa_simulation',
-        name= 'daa_simulation',
+        executable='mit_simulation',
+        name= 'mit_simulation',
         output = 'screen',
         parameters=[{
             'data_directory': new_folder_path,

@@ -12,6 +12,7 @@ find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
 find_package(gnss_multipath_plugin REQUIRED) 
+find_package(uav_dynamics REQUIRED) 
 find_package(gz-math7 REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -28,6 +29,7 @@ ament_target_dependencies(save_uav_info_node
   "rosgraph_msgs"
   "gz-math7"
   "gnss_multipath_plugin"
+  "uav_dynamics"
 )
 # Intall the executable:
 install(TARGETS save_uav_info_node

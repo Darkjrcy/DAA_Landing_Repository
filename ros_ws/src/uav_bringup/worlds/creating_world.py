@@ -100,7 +100,7 @@ def calculate_bbox_are(min_lat, max_lat, min_lon, max_lon):
 def download_mapbox_image(img_min_lat, img_max_lat, img_min_lon, img_max_lon, save_path):
     # Get the number of grids using the area:
     area = calculate_bbox_are(img_min_lat, img_max_lat, img_min_lon, img_max_lon)
-    grid_size = math.ceil(math.sqrt(area / 0.5))
+    grid_size = min(math.ceil(math.sqrt(area / 0.5)), 5)
     # Define the grid step:
     lat_step = (img_max_lat - img_min_lat) / grid_size
     lon_step = (img_max_lon - img_min_lon) / grid_size
@@ -600,18 +600,18 @@ def generate_world_file(name, worlds_folder):
 
 ################################## MAIN CODE #######################################
 # Define the characteristcs:
-lat_cen = 51.500833
-lon_cen = -0.123231
+lat_cen = 42.470750
+lon_cen = -71.288961
 
 # Define the area lengths in mi:
-lon_length = 2.0
-lat_length = 2.0
+lon_length = 3.0
+lat_length = 3.0
 
 # Deifne teh plugin version (free or pro):
 blosm_ver = "pro"
 
 # Define the anme of the mesh file and world:
-name = "BigBen"
+name = "MIT"
 folder_name = (MODELS_FOLDER / name)
 
 

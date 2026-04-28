@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'daa_simulation = daa_exec.daa_simulation:main',
+            'mit_simulation = daa_exec.mit_simulation:main',
             'stop_simulation = daa_exec.stop_simulation:main',
             'wait_for_gz = daa_exec.wait_for_gz:main',
         ],

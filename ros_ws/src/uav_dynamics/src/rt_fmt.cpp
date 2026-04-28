@@ -71,7 +71,7 @@ int computeSamples(const std::vector<std::vector<double>>& limits){
 
 
 // Check teh Occupancy of maps in teh node space:
-double checkOccupancy(const std::vector<int>& map, const Eigen::Vector3d& pt) {
+double checkOccupancy(const std::vector<int>& /*map*/, const Eigen::Vector3d& /*pt*/) {
     return 0.0; // At the moment the maps are not defined so we stay them as 0
 }
 
@@ -218,7 +218,7 @@ double getBiasCost(int childIdx, double parentCost, double pathLength, double he
 
 
 // Get the cost of the nodes inside the search space:
-std::vector<double> costMetric(const std::vector<Eigen::Vector4d>& V, const std::vector<int>& waypoint_idx, const Eigen::Vector4d& x, double w1, double w2) {
+std::vector<double> costMetric(const std::vector<Eigen::Vector4d>& V, const std::vector<int>& waypoint_idx, const Eigen::Vector4d& x, double w1, double /*w2*/) {
     // Define the number of nodes:
     int N = V.size();
     // Create a vector for the costs:
@@ -363,7 +363,7 @@ void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<do
 // Pass to the function 
 FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles, 
     double own_e, double own_n, double own_u, double own_ve, double own_vn, double own_vu,
-    double crit_time, double min_radius) {
+    double /*crit_time*/, double /*min_radius*/) {
     // Add a structure to save all teh conflicting obstacles:
     FMTBundle fmt_bundle;
     // Own velocity norm:
@@ -382,10 +382,8 @@ FMTBundle FMT_Detect(const uav_dynamics::msg::AvoidanceStates &moving_obstacles,
         const double dm = 1.5 * (obs_velocity_a * 1.0 + 500.0 + 1.5 * 6.0 + 1.0 * own_vel_a);
         const std::string &id = moving_obstacles.obstacles_id[i];
 
-        const double search_radius = 1.25 * (dm + min_radius + crit_time * own_vel_a);
-
         // If the obstacle is close enough to care about, add it to the bundle!
-        if (r_rel <= search_radius * 1.5) {
+        if (r_rel <= dm) {
             fmt_bundle.conflicts += 1.0;
             
             FMTDetect det;
@@ -1468,6 +1466,41 @@ RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eig
 }
 
 
+// Function to individually check if the avoider goes inside any UAV:
+inline std::vector<std::pair<std::string, int>> Detect_intrusion(const uav_dynamics::msg::AvoidanceStates &intruders,double own_e, double own_n, double own_u,double own_ve, double own_vn, double own_vu){
+    // Obtain the number of intruders:
+    const size_t n = intruders.intruder_states.size();
+    // Define a vector that defines if it enters in avoidance zone:
+    std::vector<std::pair<std::string, int>> inside_zone;
+
+    // Loop between intruders:
+    for (size_t i = 0; i<n; i++){ 
+        // Own velocity norm:
+        const double own_vel_a = std::sqrt(own_vn*own_vn+own_ve*own_ve+own_vu*own_vu);
+        // Open the data of each intruder:
+        const auto &intr = intruders.intruder_states[i];
+        const double int_velocity_a = std::sqrt(intr.v_north*intr.v_north + intr.v_east*intr.v_east + intr.v_up*intr.v_up);
+        // Get the avoidance radius:
+        const double dm = (int_velocity_a*1.5+500+1.5*6+1.5*own_vel_a);
+
+        // See if the rel_position norm is smaller than teh avodiance reaidus:
+        Eigen::Vector3d rel_pos(intr.east - own_e,
+                                intr.north - own_n,
+                                intr.up - own_u);
+
+        // If its lower it means that is inside the avoidance region:
+        if ((rel_pos.norm() - dm) <= 0 ){
+            inside_zone.push_back({intruders.obstacles_id[i], 1});
+        } else {
+            inside_zone.push_back({intruders.obstacles_id[i], 0});
+        }
+    }
+
+    return inside_zone;
+
+}
+
+
 
 
 // Start by defining a searching function of obstacles:
@@ -1486,9 +1519,17 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
     // Identify it there is an obstacle neart the next waypoints:
     FMTBundle active_obs = FMT_Detect(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, crit_time, min_radius);
 
-    // If there nor conflict exit:
-    if (active_obs.conflicts == 0){
-        return;
+    if (!nav_state.start_the_avoidance){
+        // If there nor conflict exit:
+        if (active_obs.conflicts == 0){
+            return;
+        }
+
+        // If they are obstacles you strart the avoidance:
+        nav_state.start_the_avoidance = true;
+    } else {
+        // If the system is already avoiding chekc if it is inside the avoidance zone:
+        nav_state.inside_avoidance = Detect_intrusion(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu);
     }
 
     // Define the current position of the UAV:

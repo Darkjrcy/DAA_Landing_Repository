@@ -121,10 +121,10 @@ def generate_airplanes_color_maps(names):
 
 
 # Start the executable:
-class DAASimulation(Node):
+class MITSimulation(Node):
     def __init__(self):
         # Generate the Node:
-        super().__init__('daa_simulation')
+        super().__init__('mit_simulation')
 
         # Declare the directory where the information is going to be saved:\
         self.declare_parameter('data_directory', '/DAA_FLights') # Folder to save the inforamtion
@@ -686,14 +686,14 @@ class DAASimulation(Node):
             # Remember if its a vtol it woudl run the dynamics in MATLAB, so you don't need to open them:
             if not self.is_a_vtol:
                 own_args = [
-                    "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], self.avoiders_type[name], "1", "0"
+                    "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], self.avoiders_type[name], "1", "1" 
                 ]
                 # Add it to the running process:
                 self.running_procs[name] = subprocess.Popen(own_args, start_new_session=True)
         # Now fo it for every intruder:
         for name, seg_list in self.intruders_info_string.items():
             intr_args = [
-                "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], "NONE", "0", "0"
+                "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], "NONE", "0", "0" 
             ]
             # Add it to the running process:
             self.running_procs[name] = subprocess.Popen(intr_args, start_new_session=True)
@@ -740,7 +740,7 @@ class DAASimulation(Node):
     def start_saving_nodes(self, saving_directory):
         # STrat the saving node of teh ads-b adn the real states data:
         save_args = [
-            "ros2", "run", "uav_bringup", "save_uav_info_node", saving_directory, "0"
+            "ros2", "run", "uav_bringup", "save_uav_info_node", saving_directory, "1"
         ]
         # Add the models name and define if they are avoiders or intruders:
         for name in self.model_names:
@@ -825,7 +825,7 @@ class DAASimulation(Node):
 # Main Logic
 def main(args=None):
     rclpy.init(args=args)
-    node = DAASimulation()
+    node = MITSimulation()
     try:
          node.daa_simulation_setup()
     except KeyboardInterrupt:

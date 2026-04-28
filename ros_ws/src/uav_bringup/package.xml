@@ -22,6 +22,7 @@
   <depend>std_msgs</depend>
   <depend>rosgraph_msgs</depend>
   <depend>gnss_multipath_plugin</depend>
+  <depend>uav_dynamics</depend>
   <depend>gz-math7</depend>
 
   <exec_depend>uav_description</exec_depend>

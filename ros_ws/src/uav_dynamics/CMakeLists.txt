@@ -19,7 +19,9 @@ find_package(std_msgs REQUIRED)
 # Generate the custom messgaes:
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AvoidanceStates.msg"
-  DEPENDENCIES gnss_multipath_plugin  
+  "msg/IntruderFlag.msg"
+  "msg/IntrudersStatus.msg"
+  DEPENDENCIES gnss_multipath_plugin  builtin_interfaces std_msgs
 )
 
 # Add the include directory:

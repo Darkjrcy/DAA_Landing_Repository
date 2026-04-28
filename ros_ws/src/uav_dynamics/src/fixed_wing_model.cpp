@@ -14,13 +14,16 @@
 #include <Eigen/Dense> 
 // ROS2 Messages:
 #include "uav_dynamics/msg/avoidance_states.hpp"
+#include "uav_dynamics/msg/intruders_status.hpp"
+#include "uav_dynamics/msg/intruder_flag.hpp"
 #include "gnss_multipath_plugin/msg/states_info.hpp"
 #include <geometry_msgs/msg/twist.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include "std_msgs/msg/int32.hpp"
 // Add the library of the Fast geometric avoidance ssytem:
 #include "uav_dynamics/geometric_guidance.hpp"
 // Add the library of the RT-FMT guidance system:
-#include "uav_dynamics/rt_fmt.hpp"
+#include "uav_dynamics/rt_fmt.hpp" 
 
 
 // Start the class of the fixed-wing Dynamics;
@@ -28,8 +31,8 @@ class FixedWingDynamics : public rclcpp::Node{
     public:
         // Do the starting function:
         FixedWingDynamics(const std::string &avoider_name, const std::string &waypoints_str, 
-            const std::string guidance_system, const bool active_avoidance
-            ): Node(("dynamics_" + avoider_name).c_str()), avoider_name_(avoider_name), guidance_system_(guidance_system), active_avoidance_(active_avoidance){
+            const std::string guidance_system, const bool active_avoidance, const bool avoidance_analysis
+            ): Node(("dynamics_" + avoider_name).c_str()), avoider_name_(avoider_name), guidance_system_(guidance_system), active_avoidance_(active_avoidance), avoidance_analysis_(avoidance_analysis){
 
                 // Qualioty of serviuce for the states messages:
                 auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliability(rclcpp::ReliabilityPolicy::Reliable).durability(rclcpp::DurabilityPolicy::Volatile);
@@ -48,6 +51,10 @@ class FixedWingDynamics : public rclcpp::Node{
                 std::string obstacles_topic = avoider_name_ + "/obstacles_adsb";
                 // Topc to see when the simulation is restatrded
                 std::string mission_start_topc = "/mission_starts";
+
+                // Topic for the publishers of when the avoidance occurs, and if inside an avodiacne region:
+                std::string is_inside_avoidance_topic = avoider_name_ + "/is_inside_avo";
+                std::string is_avoiding_topic = avoider_name_ + "/is_avoiding";
 
                 // Specify the vearibles used for the differnt Guidance ALgorithms:
                 if (active_avoidance_ && guidance_system_ == "GEOMETRIC") {
@@ -100,10 +107,18 @@ class FixedWingDynamics : public rclcpp::Node{
                     mission_start_topc, qos_miss, std::bind(&FixedWingDynamics::mission_start_callback, this, std::placeholders::_1)
                 );
                 
-                // Subscribe to the obstacles states:
                 if (active_avoidance_){
+                    // Subscribe to the obstacles states:
                     obstacles_states_sub_ = this->create_subscription<uav_dynamics::msg::AvoidanceStates>(
                         obstacles_topic, qos, std::bind(&FixedWingDynamics::obstacle_states_callback, this, std::placeholders::_1));
+
+                    // If the avoidance analysis is necesary add publishers of when the avoidance occurs, and is the avoidance goes against any intruder:
+                    if (avoidance_analysis_){
+                        // Publisher of the int vector showing if is inside an avodiance zone:
+                        is_inside_avo_pub_ = this->create_publisher<uav_dynamics::msg::IntrudersStatus>(is_inside_avoidance_topic, qos);
+                        // Publish if the sytem is in an avoiding maneuver:
+                        is_avoding_pub_ = this->create_publisher<std_msgs::msg::Int32>(is_avoiding_topic, qos);
+                    }
                 }
                 // Publisher to the command velcoity and use the plugin movement:
                 cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic, qos);
@@ -124,6 +139,7 @@ class FixedWingDynamics : public rclcpp::Node{
         // DEfine if the avoidance is active and the guidance technique:
         std::string guidance_system_;
         bool active_avoidance_;
+        bool avoidance_analysis_;
 
 
         // Define the wripoints vector adn the last waypoint:
@@ -154,6 +170,8 @@ class FixedWingDynamics : public rclcpp::Node{
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr complete_encounter_pub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr complete_encounter_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mission_start_sub_;
+        rclcpp::Publisher<uav_dynamics::msg::IntrudersStatus>::SharedPtr is_inside_avo_pub_;
+        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr is_avoding_pub_;
 
         // Variable to see when the UAV reaches the last waypoint:
         bool goal_reached_ = false;
@@ -189,6 +207,9 @@ class FixedWingDynamics : public rclcpp::Node{
         double fpa_limits_[2] = {-0.2, 0.2};
         // Mean airspeed:
         double mean_air_speed_;
+
+        // Start the vector where is goign to be defined if enter inside the avoidance zone:
+        std::vector<std::pair<std::string, int>> is_inside_avoidance_zone_;
 
         
 
@@ -549,8 +570,8 @@ class FixedWingDynamics : public rclcpp::Node{
                             start_the_avoidance = false;
 
                             // restore thresholds/params      
-                            transition_radius_ = 420;   
-                            look_ahead_distance_ = 250;
+                            transition_radius_ = std::max(250.0, current_min_radius * 1.5);    
+                            look_ahead_distance_ = std::max(100.0, current_speed * 0.5);
 
                             RCLCPP_INFO(this->get_logger(), "Avoidance complete; resuming nominal path.");
                         }
@@ -560,31 +581,53 @@ class FixedWingDynamics : public rclcpp::Node{
                 // Use teh FMT:
                 if (guidance_system_ == "FMT"){
                     // reduce the lookahead radius and the trnasition radius to make it more maneuverable
-                    transition_radius_ = 150;   
-
-                    look_ahead_distance_ = 100;
-                    // Add the minimum raduis to the avodance parameters.
-                    avoidance_vars_geom_->min_radius = min_radius_;
-                    avoidance_vars_geom_->crit_time = 0.1;
+                    transition_radius_ = std::max(250.0, current_min_radius * 1.5);    
+                    look_ahead_distance_ = std::max(100.0, current_speed * 0.5);
 
                     // NOTE: Because teh RT-FMT qorks based on teh goal after it starts working it is not freaseble to ave a last point of avoidance.
                 }
             }
 
             // Do stop system to stop if is near teh last waypoint:
-            if ((act_mod_pose - last_waypoint_).norm() <= 50){
-                goal_reached_ = true;
-                std_msgs::msg::Bool finish_follow;
-                // send a zero speed before starting a new trajectory
-                RCLCPP_INFO(this->get_logger(), "GOAL REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                cmd_velocity.linear.x = 0;
-                cmd_velocity.angular.x = 0;
-                cmd_velocity.angular.y = 0;
-                cmd_velocity.angular.z = 0;
-                // publish it:
-                for (int i = 0; i < 3; ++i) {
+            if ((act_mod_pose - last_waypoint_).norm() <= 100){
+
+                // If teh avoider is near the goal make it stop:
+                if (active_avoidance_) {
+                    goal_reached_ = true;
+                    // send a zero speed before starting a new trajectory
+                    RCLCPP_INFO(this->get_logger(), "GOAL REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    cmd_velocity.linear.x = 0;
+                    cmd_velocity.angular.x = 0;
+                    cmd_velocity.angular.y = 0;
+                    cmd_velocity.angular.z = 0;
+                    // publish it:
+                    for (int i = 0; i < 3; ++i) {
+                        cmd_vel_pub_->publish(cmd_velocity);
+                        rclcpp::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    // Publish to the other UAVs that the encounter is completed:
+                    if (goal_reached_ != last_published_goal_reached_) {
+                        std_msgs::msg::Bool finish_follow;
+                        finish_follow.data = goal_reached_;
+                        complete_encounter_pub_->publish(finish_follow);
+                        last_published_goal_reached_ = goal_reached_;
+                    }
+                } else {
+                    // For intruders continue flying:
+                    goal_reached_ = false;
+                    // Define cruise conditions:
+                    double cruise_speed = std::max(cmd_vel_.back() * 0.5, 10.0);
+                    double course_cmd_cruise = actual_state(3); 
+                    double alt_cmd_cruise = actual_state(2);
+                    Eigen::VectorXd cruise_dstates = FixedWingLogic(actual_state, cruise_speed, course_cmd_cruise, alt_cmd_cruise);
+
+                    cmd_velocity.linear.x = cruise_speed;
+                    cmd_velocity.angular.x = cruise_dstates(7);
+                    cmd_velocity.angular.y = -cruise_dstates(4);
+                    cmd_velocity.angular.z = -cruise_dstates(3);
+
                     cmd_vel_pub_->publish(cmd_velocity);
-                    rclcpp::sleep_for(std::chrono::milliseconds(100));
                 }
             } else {
                 goal_reached_ = false;
@@ -598,15 +641,6 @@ class FixedWingDynamics : public rclcpp::Node{
                 // publish it:
                 cmd_vel_pub_->publish(cmd_velocity);
             }
-            
-
-            // Publish to the other UAVs that the goal is completed:
-            if (goal_reached_ != last_published_goal_reached_) {
-                std_msgs::msg::Bool finish_follow;
-                finish_follow.data = goal_reached_;
-                complete_encounter_pub_->publish(finish_follow);
-                last_published_goal_reached_ = goal_reached_;
-            }
 
         }
 
@@ -614,11 +648,10 @@ class FixedWingDynamics : public rclcpp::Node{
 
         // Callback that is called when a Obstacle message is recieved:
         void obstacle_states_callback(const uav_dynamics::msg::AvoidanceStates::SharedPtr msg){
-            // Add the calcaultion if enters the avoidance zone?
-
-            // Only start if the Path follower its started:
-            if (!start_following){
-                return;
+            // Always start it:
+            is_inside_avoidance_zone_.clear();
+            for (const auto& id : msg->obstacles_id) {
+                is_inside_avoidance_zone_.push_back({id, 0});
             }
 
             // Call the guidance logic:
@@ -631,7 +664,8 @@ class FixedWingDynamics : public rclcpp::Node{
                     look_ahead_distance_, 
                     start_the_avoidance,
                     avoidance_last_point_enu, 
-                    end_of_arc_
+                    end_of_arc_,
+                    is_inside_avoidance_zone_
                 };
 
                 computeGeometricAvoidance(
@@ -648,16 +682,40 @@ class FixedWingDynamics : public rclcpp::Node{
                     current_idx,
                     transition_radius_,
                     look_ahead_distance_, 
+                    start_the_avoidance,
+                    is_inside_avoidance_zone_
                 };
 
                 computerFMTAvoidance(
                     *msg,
                     avoider_current_state_, 
-                    avoidance_vars_geom_->min_radius, 
-                    avoidance_vars_geom_->crit_time, 
+                    min_radius_, 
+                    0.3, 
                     nav_state_fmt,
                     rt_fmt_planner_.value()
                 );
+            }
+
+            // Publish the avoidance analysis if its required:
+            if (avoidance_analysis_) {
+                // Create the individual messgae for all obstacle:
+                uav_dynamics::msg::IntrudersStatus inside_msg;
+                // Loop inside each obtacle:
+                for (const auto& entry : is_inside_avoidance_zone_) {
+                    // Create if or each obstacle
+                    uav_dynamics::msg::IntruderFlag flag_msg;
+                    flag_msg.obstacle_id = entry.first;
+                    flag_msg.is_inside = entry.second;
+                    inside_msg.states.push_back(flag_msg); 
+                }
+
+                // Publish the oevrall measge for al teh obstacle:
+                is_inside_avo_pub_->publish(inside_msg);
+
+                // Check when is avoiding:
+                std_msgs::msg::Int32 avoiding_msg;
+                avoiding_msg.data = start_the_avoidance ? 1 : 0;
+                is_avoding_pub_->publish(avoiding_msg);
             }
 
         }
@@ -710,10 +768,10 @@ int main(int argc, char **argv){
     rclcpp::init(argc, argv);
 
     // Safety check that all the arguments are being inputted:
-    if (argc < 5)
+    if (argc < 6)
     {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), 
-                     "Usage: ros2 run <package_name> <executable_name> <avoider_name> <waypoints_string> <guidance_system> <active_avoidance (0 or 1)>");
+                     "Usage: ros2 run <package_name> <executable_name> <avoider_name> <waypoints_string> <guidance_system> <active_avoidance (0 or 1)> <avoidance_analysis (0 or 1)>");
         return 1;
     }
 
@@ -722,9 +780,10 @@ int main(int argc, char **argv){
     std::string waypoints_str = argv[2];
     std::string guidance_system = argv[3];
     bool active_avoidance = (std::stoi(argv[4]) != 0); 
+    bool avoidance_analysis = (std::stoi(argv[5]) != 0); 
 
     // Start the node with teh class:
-    auto node = std::make_shared<FixedWingDynamics>(avoider_name, waypoints_str, guidance_system, active_avoidance);
+    auto node = std::make_shared<FixedWingDynamics>(avoider_name, waypoints_str, guidance_system, active_avoidance, avoidance_analysis);
 
     // SPin the node:
     rclcpp::executors::SingleThreadedExecutor exec;

@@ -21,6 +21,10 @@ struct NavigationState {
     bool& start_the_avoidance;
     std::optional<Eigen::Vector3d>& avoidance_last_point_enu;
     std::optional<size_t>& end_of_arc;
+
+    // Identify if the avoider enter inside any obstacle:
+    std::vector<std::pair<std::string, int>>& inside_avoidance;
+
 };
 
 // Declare the main geometric DAA fucntion
