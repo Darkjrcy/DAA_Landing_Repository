@@ -176,7 +176,7 @@ class MITSimulation(Node):
         self.is_a_vtol = False
 
         # Define vectors to save the avoiders and the intruders:
-        self.intial_encounter = 0
+        self.intial_encounter = 13
         # Inital angle of avoiders:
         self.init_roll = {}
         self.init_pitch = {}
@@ -430,6 +430,11 @@ class MITSimulation(Node):
         mid_x = (np.max(e_all) + np.min(e_all)) / 2.0
         mid_y = (np.max(n_all) + np.min(n_all)) / 2.0
         mid_z = (np.max(alt_all) + np.min(alt_all)) / 2.0
+        # To make the Horioatnl plaen square:
+        if max_range_east > max_range_north:
+            max_range_north = max_range_east
+        else:
+            max_range_east = max_range_north
         self.ax.set_xlim(mid_x - max_range_east, mid_x + max_range_east)
         self.ax.set_ylim(mid_y - max_range_north, mid_y + max_range_north)
         self.ax.set_zlim(mid_z - max_range_alt, mid_z + max_range_alt)

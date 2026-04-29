@@ -60,7 +60,7 @@ class FixedWingDynamics : public rclcpp::Node{
                 if (active_avoidance_ && guidance_system_ == "GEOMETRIC") {
                     avoidance_vars_geom_ = GeometricAvoidanceVars{
                         180, // min_radius of turn (m)
-                        0.0002 // critical avoidance time (s)
+                        0.2 // critical avoidance time (s)
                     };
 
                     RCLCPP_INFO(this->get_logger(), "Geometric avoidance system created.");

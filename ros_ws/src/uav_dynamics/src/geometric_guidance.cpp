@@ -243,7 +243,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
             act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-min_radius-act_obstacles[i].dm) / rel_vel_norm;
         }
         // check if one of the airplanes that was already avoided is giving problems by staying in a negative avoidance zone:
-        if (act_crit_time < -3.0){continue;}
+        if (act_crit_time < -0.01){continue;}
         if (count_time == 0 || act_crit_time < min_crit_time){
             count_time = 1;
             min_crit_time = act_crit_time; 
