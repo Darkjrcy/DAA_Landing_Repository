@@ -102,13 +102,19 @@ def launch(context, *args, **kwargs):
     trajectory_info = os.path.join(install_dir, "encounter_data/test_trajectories/case_2uavs.json")
     # OPen the json file:
     with open(trajectory_info, 'r') as file:
-        trajectory_dict = json.load(file)
+        data = json.load(file)
+        trajectory_dict = data["trajectories"]
+        roll_dict_init = data["roll_init"]
+        pitch_dict_init = data["pitch_init"]
+        head_dict_init = data["head_init"]
     
-    trajectories = [
-        # UAV 1 (EX: 2 Trajectories):
-        trajectory_dict["uav_1"],
-        trajectory_dict["uav_2"],
-    ]
+    num_uavs = len(robot_names)
+    # Define the ttrajectories:
+    trajectories = [trajectory_dict[f"uav_{i+1}"] for i in range(num_uavs)]
+    # Create the intial attitude strings to send it to the MIT base system:
+    roll = [roll_dict_init[f"roll_{i+1}"] for i in range(num_uavs)]
+    pitch = [pitch_dict_init[f"pitch_{i+1}"] for i in range(num_uavs)]
+    heading = [head_dict_init[f"head_{i+1}"] for i in range(num_uavs)]
 
     # Define which of the UAVs have aviodance:
     has_avoidance = [True, False]
@@ -223,6 +229,9 @@ def launch(context, *args, **kwargs):
             'model_names': robot_names,
             'uav_type': type_uav,
             'model_waypoints': trajectories,
+            'initial_roll' : roll,
+            'initial_pitch': pitch,
+            'initial_heading': heading,
             'has_avoidance': has_avoidance,
             'avoidance_types': type_avoidance,
         }]

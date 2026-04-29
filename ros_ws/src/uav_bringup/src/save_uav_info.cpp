@@ -422,7 +422,7 @@ class SaveUAVInfo : public rclcpp::Node{
                                 avo_file << "," << first_record.states[j].obstacle_id;
                             }
                             // Header with teh boolean to se if the avoider is active:
-                            avo_file << ",avoidance_started\n";
+                            avo_file << ",is_inside_avoidance_zone,avoidance_started\n";
 
                             // Write teh avoidance info data:
                             for (const auto& avo_data : avoidance_histories_[name]) {

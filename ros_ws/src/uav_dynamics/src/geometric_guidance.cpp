@@ -226,10 +226,24 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     int crit_target_idx = 0;
 
     for (size_t i = 0; i < n ; ++i){
+        // Get the relative velocity:
+        double rel_vel_norm = act_obstacles[i].rel_vel_enu.norm();
+        double act_crit_time;
         // Caclulate the critical time of each target:
-        double act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-min_radius-act_obstacles[i].dm)/(act_obstacles[i].rel_vel_enu.norm());
+        if (rel_vel_norm < 1e-3) {
+            // If they are flying parallel AND already inside the avoidance zone, trigger instantly
+            if (act_obstacles[i].rel_pos_enu.norm() < act_obstacles[i].dm) {
+                act_crit_time = 0.0; 
+            } else {
+                // Flying parallel but safely outside the zone
+                act_crit_time = 9999.0; 
+            }
+        } else {
+            // Normal calculation for converging trajectories
+            act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-min_radius-act_obstacles[i].dm) / rel_vel_norm;
+        }
         // check if one of the airplanes that was already avoided is giving problems by staying in a negative avoidance zone:
-        if (act_crit_time < -1.5){continue;}
+        if (act_crit_time < -3.0){continue;}
         if (count_time == 0 || act_crit_time < min_crit_time){
             count_time = 1;
             min_crit_time = act_crit_time; 
@@ -326,9 +340,15 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         double d_east = circle[i].x() - act_pos.x();
         double horiz = std::max(std::sqrt(d_north*d_north + d_east*d_east), 1e-6);
         double d_pitch = std::atan2(d_alt, horiz);
-        double d_yaw   = std::atan2(d_east, std::max(d_north, 1e-9)); // yaw-from-East
+        double d_yaw   = std::atan2(d_east, std::max(d_north, 1e-9));
+        double d_yaw_diff = d_yaw - own_course;
+        while (d_yaw_diff > M_PI) d_yaw_diff -= 2.0 * M_PI;
+        while (d_yaw_diff < -M_PI) d_yaw_diff += 2.0 * M_PI;
 
         // Get a ratio that depends on the next posiiton orientation respct to teh pincipal avoidance circle position:
+        if (circle[i].z() < 0) {
+            continue;
+        }
         Eigen::Vector3d r_avo_fut = crit_next_pos - avoidance_center;
         Eigen::Vector3d r_avo_circ = circle[i]  - avoidance_center;
         double value_1 = std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
@@ -336,11 +356,11 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
         double cost;
         if ((d_pitch - own_pitch) < 0.0) {
-            cost = ((1.0/(value_1+0.1)) + 2.4) * std::abs(d_pitch)
-                + (1.0/(value_1+0.1)) * std::abs(d_yaw);
+            cost = ((1.0/(value_1+0.1)) + 10.0) * std::abs(d_pitch)
+                + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         } else {
             cost = ((1.0/(value_1+0.1)) + 1.2) * std::abs(d_pitch)
-                + (1.0/(value_1+0.1)) * std::abs(d_yaw);
+                + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         }
 
         if (min_cost < 0.0 || cost < min_cost) {

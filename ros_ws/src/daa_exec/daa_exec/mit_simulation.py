@@ -71,6 +71,16 @@ def parse_multiple_wp_strings(mult_wp_string):
         segments.append(parse_wp_string(seg))
     return segments
 
+
+
+# FUnction to parse the big list of angles a string has:
+def parse_orientatation(multi_orient_sting):
+    orient = []
+    for angle in multi_orient_sting.split(';'):
+        orient.append(float(angle))
+    return orient
+
+
 # Format string from numbers:
 def _format_num(x: float) -> str:
     # neat, short float formatting (no trailing zeros)
@@ -147,19 +157,30 @@ class MITSimulation(Node):
             '0,50,-50,5;450,85,-20,5 % 500,100,-20,6', 
             '10,60,-50,5;460,95,-20,5 % 510,110,-20,6'  
         ])
+        self.declare_parameter('initial_roll', ['0', '0'])
+        self.declare_parameter('initial_pitch', ['0', '0'])
+        self.declare_parameter('initial_heading', ['0', '0'])
         self.declare_parameter('has_avoidance', [True, False])
         self.declare_parameter('avoidance_types', ['GEOMETRIC', 'NO'])
         # Save the values:
         self.model_names = self.get_parameter('model_names').value
         uav_type = self.get_parameter('uav_type').value
         model_wp_raw = self.get_parameter('model_waypoints').value
+        intial_roll_raw = self.get_parameter('initial_roll').value
+        intial_pitch_raw = self.get_parameter('initial_pitch').value
+        intial_heading_raw = self.get_parameter('initial_heading').value
         has_avoidance = self.get_parameter('has_avoidance').value
         avoidance_types = self.get_parameter('avoidance_types').value
-
+ 
         # Identify if one of the avoiders is a VTOL:
         self.is_a_vtol = False
 
         # Define vectors to save the avoiders and the intruders:
+        self.intial_encounter = 0
+        # Inital angle of avoiders:
+        self.init_roll = {}
+        self.init_pitch = {}
+        self.init_head = {}
         # AVoiders:
         self.avoiders_info_string = {}
         self.avoiders_info = {}
@@ -172,15 +193,22 @@ class MITSimulation(Node):
         # Forloop between the model_names:
         for i in range(len(self.model_names)):
             if has_avoidance[i]:
+                # Deinfe hte segment of trajecotries of each avoider:
                 self.avoiders_info_string[self.model_names[i]] = separate_wp(model_wp_raw[i])
                 self.avoiders_info[self.model_names[i]] = parse_multiple_wp_strings(model_wp_raw[i])
                 self.avoiders_type[self.model_names[i]] = avoidance_types[i]
                 if uav_type[i] == "vtol":
                     self.is_a_vtol = True
             else:
+                # Deifne the segmetns of trajectories of ech intruder
                 self.intruders_info_string[self.model_names[i]] = separate_wp(model_wp_raw[i])
                 self.intruders_info[self.model_names[i]] = parse_multiple_wp_strings(model_wp_raw[i])
             self.uav_type[self.model_names[i]] = uav_type[i]
+
+            # Define the angles of the airaplnes:
+            self.init_roll[self.model_names[i]] = parse_orientatation(intial_roll_raw[i])
+            self.init_pitch[self.model_names[i]] = parse_orientatation(intial_pitch_raw[i])
+            self.init_head[self.model_names[i]] = parse_orientatation(intial_heading_raw[i])
         
 
         # Start the plot for the airpalne Trahectory:
@@ -507,9 +535,11 @@ class MITSimulation(Node):
     # Function to spawn the model using the gz service:
     def call_service_change_position(self, entity_name: str, east, north, alt, roll, fpa, course) -> bool:
         # Convert euler angles to quaternions:
-        yaw = np.pi/2 - course
+        yaw = np.pi/2 - (np.pi/2 - course)
         pitch = -fpa
         quat = R.from_euler('xyz', [roll, pitch, yaw]).as_quat()
+
+        print(f"DEBUG - Anggles: {roll}, {pitch}, {yaw}", flush=True)
 
         # Build the gazebo command:
         gz_str = (
@@ -716,21 +746,12 @@ class MITSimulation(Node):
 
 
     # Function to spawn the airplane at the initial position by using the first waypoints:
-    def spawn_the_UAV_using_waypoints(self, name, trajectory):
+    def spawn_the_UAV_using_waypoints(self, name, trajectory, roll, pitch, heading):
         # Define the teo points:
         pos0 = trajectory[0,:]
-        pos1 = trajectory[1,:]
-        # Calcualte the required deltas:
-        delta_pos = pos1 - pos0
-
-        # Define the angles of orientation of the UAV:
-        # Fligth path angle:
-        fpa = np.arctan2(delta_pos[2], np.hypot(delta_pos[0], delta_pos[1]))
-        # Course angle:
-        course = np.arctan2(delta_pos[1], delta_pos[0]) 
         
         # Start the spawning:
-        if not self.call_service_change_position(name, pos0[1], pos0[0], pos0[2], 0.0, fpa, course):
+        if not self.call_service_change_position(name, pos0[1], pos0[0], pos0[2], roll, pitch, heading):
                         return
         time.sleep(5)
 
@@ -765,56 +786,57 @@ class MITSimulation(Node):
 
         # Iterate thorugh the smiulation encounters:
         for i in range(num_encounters):
-            self.get_logger().info(f"========== STARTING ENCOUNTER {i} ==========")
-            # Restart the varaibles and wait some time before starting:
-            self.restart_varibles()
-            time.sleep(5)
+            if i >= self.intial_encounter:
+                self.get_logger().info(f"========== STARTING ENCOUNTER {i} ==========")
+                # Restart the varaibles and wait some time before starting:
+                self.restart_varibles()
+                time.sleep(5)
 
-            # Create a new direction and start the saving nodes:
-            encounter_dir = os.path.join(self.save_dir, f"Encounter_{i}")
-            if not os.path.exists(encounter_dir):
-                os.makedirs(encounter_dir)
-            self.start_saving_nodes(encounter_dir)
-            self.mission_started = False
+                # Create a new direction and start the saving nodes:
+                encounter_dir = os.path.join(self.save_dir, f"Encounter_{i}")
+                if not os.path.exists(encounter_dir):
+                    os.makedirs(encounter_dir)
+                self.start_saving_nodes(encounter_dir)
+                self.mission_started = False
 
-            # Start the plotting:
-            self.setup_plot( i)
-            # Draw the plot:
-            plt.draw()
-            plt.pause(0.5)
+                # Start the plotting:
+                self.setup_plot( i)
+                # Draw the plot:
+                plt.draw()
+                plt.pause(0.5)
 
-            # Spawn the avoiders:
-            for name, segments in self.avoiders_info.items():
-                if self.uav_type[name] == "vtol":
-                    continue
-                self.spawn_the_UAV_using_waypoints(name, segments[i])
-            # Spawn the intruders:
-            for name, segments in self.intruders_info.items():
-                self.spawn_the_UAV_using_waypoints(name, segments[i])
+                # Spawn the avoiders:
+                for name, segments in self.avoiders_info.items():
+                    if self.uav_type[name] == "vtol":
+                        continue
+                    self.spawn_the_UAV_using_waypoints(name, segments[i], self.init_roll[name][i], self.init_pitch[name][i], self.init_head[name][i])
+                # Spawn the intruders:
+                for name, segments in self.intruders_info.items():
+                    self.spawn_the_UAV_using_waypoints(name, segments[i], self.init_roll[name][i], self.init_pitch[name][i], self.init_head[name][i])
 
-            # Restart the ADS0B transmitter:
-            self.restart_all_adsb()
-            
-            # Launch the uav dynamics process:
-            self.start_uav_dynamics(i)
-            # Wait a few seconds before stariting the mission:
-            self.get_logger().info("Waiting for UAV nodes to boot and connect.")
-            time.sleep(3.0)
-            # Start the mission:
-            self.start_the_mission()
+                # Restart the ADS0B transmitter:
+                self.restart_all_adsb()
+                
+                # Launch the uav dynamics process:
+                self.start_uav_dynamics(i)
+                # Wait a few seconds before stariting the mission:
+                self.get_logger().info("Waiting for UAV nodes to boot and connect.")
+                time.sleep(3.0)
+                # Start the mission:
+                self.start_the_mission()
 
-            # Wait until trajecotry complete:
-            while not self.traj_complete:
-                rclpy.spin_once(self, timeout_sec=0.1)
+                # Wait until trajecotry complete:
+                while not self.traj_complete:
+                    rclpy.spin_once(self, timeout_sec=0.1)
 
-            # Clean up all spawned subprocesses before looping to the next encounter
-            self.stop_wait_the_followers()
+                # Clean up all spawned subprocesses before looping to the next encounter
+                self.stop_wait_the_followers()
 
-            # Also kill the saving nodes!
-            for name, p in list(self.save_info_procs.items()):
-                if p.poll() is None:
-                    p.terminate()
-            self.save_info_procs.clear()
+                # Also kill the saving nodes!
+                for name, p in list(self.save_info_procs.items()):
+                    if p.poll() is None:
+                        p.terminate()
+                self.save_info_procs.clear()
         
         # After all of them finishes stop teh simulation:
         msg = Bool()

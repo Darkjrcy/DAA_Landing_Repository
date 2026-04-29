@@ -60,7 +60,7 @@ class FixedWingDynamics : public rclcpp::Node{
                 if (active_avoidance_ && guidance_system_ == "GEOMETRIC") {
                     avoidance_vars_geom_ = GeometricAvoidanceVars{
                         180, // min_radius of turn (m)
-                        0.1 // critical avoidance time (s)
+                        0.0002 // critical avoidance time (s)
                     };
 
                     RCLCPP_INFO(this->get_logger(), "Geometric avoidance system created.");
@@ -451,7 +451,7 @@ class FixedWingDynamics : public rclcpp::Node{
             const double kp_Y = 0.25; // proportional gain of the course
             const double kp_h = 0.4; // proportional gain of the velocity
             const double kp_heading = 0.8; // proportional gain of the heading
-
+            
             // Start teh derivative vector:
             Eigen::VectorXd dstate(8);
 
@@ -589,7 +589,7 @@ class FixedWingDynamics : public rclcpp::Node{
             }
 
             // Do stop system to stop if is near teh last waypoint:
-            if ((act_mod_pose - last_waypoint_).norm() <= 100){
+            if ((act_mod_pose - last_waypoint_).norm() <= 300){
 
                 // If teh avoider is near the goal make it stop:
                 if (active_avoidance_) {
