@@ -38,3 +38,39 @@ sudo apt install ros-humble-ros-gzgarden
 
 **MATLAB Pre-compiled Functions:**
 In order for the real-time Fast Marching Tree (FMT) to work correctly using the UAV Dubins paths, the simulation utilizes pre-compiled functions from MATLAB. To install these, please follow the specific setup process detailed inside the [matlab_obj](https://github.com/Darkjrcy/DAA_Landing_Repository/tree/main/ros_ws/src/uav_dynamics/src)  directory.
+
+## Setup & Configuration
+There are different ways to modify the simulation to fit your specific testing needs. The two primary files where you can customize the environment and simulation parameters are:
+- **World Generator:** By default, Gazebo does not have a built-in tool to generate environments directly from real-world geographical positions. To solve this, this repository includes a custom [world generator function](https://github.com/Darkjrcy/DAA_Landing_Repository/tree/main/ros_ws/src/uav_bringup/worlds). This allows users to test their DAA scenarios in realistic environments with buildings, visual clutter, and accurate terrain. Additionally, the inclusion of 3D buildings enhances the realism of the GNSS plugin, which incorporates a multipath error logic based on line-of-sight signal obstructions.
+- **Launch File ([`main_uav_launch`](https://github.com/Darkjrcy/DAA_Landing_Repository/tree/main/ros_ws/src/uav_bringup/launch)):** The launch file is the central hub where the user defines the core characteristics, parameters, and behaviors of the main simulation.
+
+## Launch the Simulation:
+Before using any of the packages, executables, or launch files, you must build the workspace. It is recommended to build the `libpredict` package first before building the rest of the repository.
+
+Run the following commands:
+``` bash
+cd ros_ws
+# Build the libpredict package first:
+colcon build --packages-select libpredict
+# Build the otehr packages:
+colcon build
+```
+
+Next, source your ROS 2 installation and the simulation repository workspace:
+``` bash 
+# Source the ROS 2 and Gazebo installation (if you haven't already):
+source /opt/ros/humble/setup.bash
+
+# Source the DAA Repository:
+source .../DAA_Landing_Repository/ros_ws/install/setup.bash
+```
+
+Once everything is built and sourced, you can start the simulation environment:
+```bash
+ros2 launch uav_bringup main_uav_fligth.launch.py 
+
+```
+
+**Data Logging:** 
+After the simulation ends, the UAV encounter information is automatically saved in `.../uav_bringup/saving_data/Test_n`, where `n` corresponds to the sequence number of the test you are currently running.
+
