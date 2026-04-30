@@ -482,7 +482,12 @@ class FixedWingDynamics : public rclcpp::Node{
             dstate(5) = kp_V * (vel_cmd - V);
             dstate(6) = state(7);
             dstate(7) = kp_roll * (roll_cmd - state(6)) - kd_roll * state(7);
-            
+
+            // Establish some limits:
+            dstate(4) = std::clamp(dstate(4), -3.0 * (M_PI / 180.0), 3.0 * (M_PI / 180.0));  // pitch rate
+            dstate(3) = std::clamp(dstate(3), -6.0 * (M_PI / 180.0), 6.0 * (M_PI / 180.0));  // heading rate
+            dstate(6) = std::clamp(dstate(6), -30.0 * (M_PI / 180.0), 30.0 * (M_PI / 180.0)); // roll rate
+
             return dstate;
         }
 
