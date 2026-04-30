@@ -297,7 +297,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
     // Generate the avoidance zone:
     // Deine the normal avoidance circle normal to the velcoity of the ownship:
-    int N = 54;
+    int N = 120;
     // Rotation matrices:
     Eigen::Matrix3d Rz, Ry;
     Rz << std::cos(own_yaw), -std::sin(own_yaw), 0,
@@ -365,15 +365,15 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         }
         Eigen::Vector3d r_avo_fut = crit_next_pos - avoidance_center;
         Eigen::Vector3d r_avo_circ = circle[i]  - avoidance_center;
-        double value_1 = 0.5*std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
+        double value_1 = 2 * std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
         
 
         double cost;
-        if ((d_pitch) < 0.0) {
-            cost = ((1.0/(value_1+0.1)) + 20) * std::abs(d_pitch)
+        if ((d_pitch) < 0.0 || d_alt !=0) {
+            cost = ((1.0/(value_1+0.1)) + 200) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         } else {
-            cost = ((1.0/(value_1+0.1)) + 5) * std::abs(d_pitch)
+            cost = ((1.0/(value_1+0.1)) + 100) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         }
 
@@ -401,30 +401,36 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     P.col(0) = ort_norm;
     P.col(1) = own_vel_norm;
     P.col(2) = principal_avoidance_point_enu_new;
-    // Anilize if the rotation needs to go from +/- 90 deg using the closests avoidance point:
-    const Eigen::Vector3d start_cand_1 = avoidance_center + dm_avoid * (P * Rx_deg(-60.0) * P.transpose() * principal_avoidance_point_enu_new);
-    const Eigen::Vector3d start_cand_2 = avoidance_center + dm_avoid * (P * Rx_deg(60.0) * P.transpose() * principal_avoidance_point_enu_new);
-    // Check which starting point is closest to the drone's actual current position:
+    // Get the rotation axis (already normalized)
+    Eigen::Vector3d axis = ort_norm.normalized();
+    // Add a 15% safety buffer to the avoidance radius to prevent corner-cutting
+    double safe_dm_avoid = dm_avoid * 1.15; 
+    // Determine closest starting point using Eigen's built-in axis rotation
+    const Eigen::Vector3d start_cand_1 = avoidance_center + safe_dm_avoid * (Eigen::AngleAxisd(-60.0 * M_PI / 180.0, axis) * principal_avoidance_point_enu_new);
+    const Eigen::Vector3d start_cand_2 = avoidance_center + safe_dm_avoid * (Eigen::AngleAxisd(60.0 * M_PI / 180.0, axis) * principal_avoidance_point_enu_new);
+    // Check which starting point is closest to the drone's actual current position
     const double dist1 = (act_pos - start_cand_1).squaredNorm();
     const double dist2 = (act_pos - start_cand_2).squaredNorm();
-    // Generate the avoidance trajectory starting from the closest point:
-    std::array<double,7> phi = (dist1 < dist2)
-        ? std::array<double,7>{-60.0, -30.0, -15.0, 0.0, 15.0, 30.0, 60.0}
-        : std::array<double,7>{60.0, 30.0, 15.0, 0.0, -15.0, -30.0, -60.0};
-    // Vector to save the avoidance waypoint path:
-    std::vector<Eigen::Vector3d> avoidance_waypoints; avoidance_waypoints.reserve(7);
+    // Select the angle sequence
+    std::array<double,11> phi = (dist1 < dist2)
+        ? std::array<double,11>{-80.0, -70.0, -60.0, -30.0, -15.0, 0.0, 15.0, 30.0, 60.0, 70.0, 80.0}
+        : std::array<double,11>{80.0, 70.0, 60.0, 30.0, 15.0, 0.0, -15.0, -30.0, -60.0, -70.0, -80.0}; 
+    // Generate the avoidance waypoint path
+    std::vector<Eigen::Vector3d> avoidance_waypoints; 
+    avoidance_waypoints.reserve(11);
     for (double angle : phi)
     {
-        Eigen::Vector3d avoid_point = dm_avoid * (P * Rx_deg(angle) * P.transpose() * principal_avoidance_point_enu_new) + avoidance_center;
+        Eigen::Vector3d avoid_point = avoidance_center + safe_dm_avoid * (Eigen::AngleAxisd(angle * M_PI / 180.0, axis) * principal_avoidance_point_enu_new);
         avoidance_waypoints.push_back(ENU_to_NED(avoid_point));
     }
 
-    // Insert the 7 waypoints in the waypoint list:
+
+    // Insert the 11 waypoints in the waypoint list:
     nav_state.waypoints.insert(nav_state.waypoints.begin() + static_cast<long>(insert_at_wp), avoidance_waypoints.begin(), avoidance_waypoints.end());
     // Add velocities as the akst velocity multiplied:
     const double keep_speed = (insert_at_wp < nav_state.cmd_vel.size()) ? nav_state.cmd_vel[insert_at_wp] : 0.0;
-    nav_state.cmd_vel.insert(nav_state.cmd_vel.begin() + static_cast<long>(insert_at_wp), 7, keep_speed);
-    const size_t arc_len = avoidance_waypoints.size(); // 7
+    nav_state.cmd_vel.insert(nav_state.cmd_vel.begin() + static_cast<long>(insert_at_wp), 11, keep_speed);
+    const size_t arc_len = avoidance_waypoints.size(); // 11
     nav_state.end_of_arc = insert_at_wp + arc_len - 1;
     // eliminate the middle waypoints in the avoidance path;
     size_t rejoin_idx_new = near_wp_idx;

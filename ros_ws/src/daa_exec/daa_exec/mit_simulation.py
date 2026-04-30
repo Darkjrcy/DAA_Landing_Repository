@@ -414,7 +414,11 @@ class MITSimulation(Node):
         
         # Generte the dynamics plots for the models:
         for name in self.model_names:
-            (line,) = self.ax.plot([],[],[],'m')
+            if name in self.avoiders_info:
+                live_color = 'g'
+            else:
+                live_color = 'r'
+            (line,) = self.ax.plot([],[],[], color=live_color, linewidth=2)
             self.model_lines[name] = line
         
         # Plot the legeneds:
@@ -437,7 +441,7 @@ class MITSimulation(Node):
             max_range_east = max_range_north
         self.ax.set_xlim(mid_x - max_range_east, mid_x + max_range_east)
         self.ax.set_ylim(mid_y - max_range_north, mid_y + max_range_north)
-        self.ax.set_zlim(mid_z - max_range_alt, mid_z + max_range_alt)
+        self.ax.set_zlim(mid_z - max_range_east, mid_z + max_range_east)
         plt.show(block=False)
             
 

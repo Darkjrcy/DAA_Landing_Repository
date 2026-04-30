@@ -204,7 +204,7 @@ class FixedWingDynamics : public rclcpp::Node{
         // RT-FMT Planner:
         std::optional<FMTPlanner> rt_fmt_planner_;
         // Uav parameters (that are not defined alrady):
-        double fpa_limits_[2] = {-0.2, 0.2};
+        double fpa_limits_[2] = {-0.3, 0.3};
         // Mean airspeed:
         double mean_air_speed_;
 
@@ -445,12 +445,12 @@ class FixedWingDynamics : public rclcpp::Node{
         Eigen::VectorXd FixedWingLogic(const Eigen::VectorXd &state, double vel_cmd, double course_cmd, double alt_cmd){
             // Define the constant values
             const double g = 9.81;   // gravity
-            const double kp_V = 0.3; // proportional gain of the velocity
-            const double kp_roll = 2.5; //proportional gain of the roll
-            const double kd_roll = 0.8; //derivatice gain of the roll
-            const double kp_Y = 1.0; // proportional gain of the course
+            const double kp_V = 0.6; // proportional gain of the velocity
+            const double kp_roll = 1.1; //proportional gain of the roll
+            const double kd_roll = 1.8; //derivatice gain of the roll
+            const double kp_Y = 0.5; // proportional gain of the course
             const double kp_h = 0.4; // proportional gain of the velocity
-            const double kp_heading = 0.8; // proportional gain of the heading
+            const double kp_heading = 0.4; // proportional gain of the heading
             
             // Start teh derivative vector:
             Eigen::VectorXd dstate(8);
@@ -470,8 +470,7 @@ class FixedWingDynamics : public rclcpp::Node{
             // Obtian the FPA command:
             double alt_diff = kp_h * (alt_cmd - state(2));
             alt_diff = std::clamp(alt_diff, -V, V);
-            double max_fpa = 15.0 * M_PI / 180.0;
-            double Y_cmd = std::clamp(std::asin((1.0 / V) * alt_diff), -max_fpa, max_fpa);
+            double Y_cmd = std::clamp(std::asin((1.0 / V) * alt_diff), -25.0 * (M_PI / 180.0), 25.0 * (M_PI / 180.0));
 
             // Genate the derivative vector:
             dstate(0) = V * cos(state(3)) * cos(state(4));
@@ -480,8 +479,8 @@ class FixedWingDynamics : public rclcpp::Node{
             dstate(3) = (g * tan(state(6))) / V;
             dstate(4) = kp_Y * (Y_cmd - state(4));
             dstate(5) = kp_V * (vel_cmd - V);
-            dstate(6) = state(7);
             dstate(7) = kp_roll * (roll_cmd - state(6)) - kd_roll * state(7);
+            dstate(6) = 0.1 * dstate(7) + state(7);\
 
             // Establish some limits:
             dstate(4) = std::clamp(dstate(4), -3.0 * (M_PI / 180.0), 3.0 * (M_PI / 180.0));  // pitch rate
@@ -532,10 +531,10 @@ class FixedWingDynamics : public rclcpp::Node{
 
             // Calacualte the lookahed aditsnte and the transitionr adius:
             double current_speed = std::max(velocity_a, 1.0);
-            double current_min_radius = (current_speed * current_speed) / (std::tan(max_roll_) * 9.81);
+            double current_min_radius = 2.0 * (current_speed * current_speed) / (std::tan(max_roll_) * 9.81);
             if (!start_the_avoidance) {
-                transition_radius_ = std::max(250.0, current_min_radius * 1.5); 
-                look_ahead_distance_ = std::max(100.0, current_speed * 0.5); 
+                transition_radius_ = std::max(100.0, current_min_radius * 2.0); 
+                look_ahead_distance_ = std::max(20.0, current_speed * 3.0); 
             }
 
             // USe the Waypoint follower to obtain teh next waypoint to follow:
@@ -576,8 +575,8 @@ class FixedWingDynamics : public rclcpp::Node{
                             start_the_avoidance = false;
 
                             // restore thresholds/params      
-                            transition_radius_ = std::max(250.0, current_min_radius * 1.5);    
-                            look_ahead_distance_ = std::max(100.0, current_speed * 0.5);
+                            transition_radius_ = std::max(100.0, current_min_radius * 2.0);    
+                            look_ahead_distance_ = std::max(20.0, current_speed * 0.5);
 
                             RCLCPP_INFO(this->get_logger(), "Avoidance complete; resuming nominal path.");
                         }
@@ -587,8 +586,8 @@ class FixedWingDynamics : public rclcpp::Node{
                 // Use teh FMT:
                 if (guidance_system_ == "FMT"){
                     // reduce the lookahead radius and the trnasition radius to make it more maneuverable
-                    transition_radius_ = std::max(250.0, current_min_radius * 1.5);    
-                    look_ahead_distance_ = std::max(100.0, current_speed * 0.5);
+                    transition_radius_ = std::max(100.0, current_min_radius * 2.0);    
+                    look_ahead_distance_ = std::max(20.0, current_speed * 0.5);
 
                     // NOTE: Because teh RT-FMT qorks based on teh goal after it starts working it is not freaseble to ave a last point of avoidance.
                 }
@@ -629,7 +628,7 @@ class FixedWingDynamics : public rclcpp::Node{
                     Eigen::VectorXd cruise_dstates = FixedWingLogic(actual_state, cruise_speed, course_cmd_cruise, alt_cmd_cruise);
 
                     cmd_velocity.linear.x = cruise_speed;
-                    cmd_velocity.angular.x = cruise_dstates(7);
+                    cmd_velocity.angular.x = cruise_dstates(6);
                     cmd_velocity.angular.y = -cruise_dstates(4);
                     cmd_velocity.angular.z = -cruise_dstates(3);
 
@@ -640,10 +639,18 @@ class FixedWingDynamics : public rclcpp::Node{
                 // Send the required velcoity command:
                 double com_linear_vel = std::clamp(vel_cmd, 5.0, 420.0);
                 cmd_velocity.linear.x = com_linear_vel;
-                cmd_velocity.linear.x = com_linear_vel;
-                cmd_velocity.angular.x = actual_dstates(7);
-                cmd_velocity.angular.y = -actual_dstates(4);
-                cmd_velocity.angular.z = -actual_dstates(3);
+                // Pass the angular velcoites in teh Earth RF to body angular veloicites commands:
+                double phi   = actual_state(6); 
+                double theta = actual_state(4);
+                double dot_phi   = actual_dstates(6);
+                double dot_theta = actual_dstates(4); 
+                double dot_psi   = actual_dstates(3);
+                double p = dot_phi - dot_psi * std::sin(theta);
+                double q = dot_theta * std::cos(phi) + dot_psi * std::cos(theta) * std::sin(phi);
+                double r = -dot_theta * std::sin(phi) + dot_psi * std::cos(theta) * std::cos(phi);
+                cmd_velocity.angular.x = p;
+                cmd_velocity.angular.y = -q; 
+                cmd_velocity.angular.z = -r;
                 // publish it:
                 cmd_vel_pub_->publish(cmd_velocity);
             }
