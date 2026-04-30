@@ -87,8 +87,27 @@ FCABundle FCA_Detect(const uav_dynamics::msg::AvoidanceStates &intruders,double 
 
         // Obtian the closest future relative radius:
         const double r_pca = r_rel * std::sin(theta_to);
+
+        // DEBUGING:
+        std::cout << "[FCA Debug] Intruder: " << id 
+          << " | r_rel: " << r_rel 
+          << " | r_pca: " << r_pca 
+          << " | dm: " << dm << std::endl;
+          
         // Analize if hte intruder is an active obstacle:
         if (r_pca < dm){
+            ++fca_bundle.conflicts;
+
+            FCADetect det;
+            det.aiplane_id = id;
+            det.rel_pos_enu = rel_pos;
+            det.rel_vel_enu = rel_vel;
+            det.theta_to = theta_to;
+            det.r_pca = r_pca;
+            det.dm = dm;
+
+            fca_bundle.act_intruders.push_back(det);
+        } else if (r_rel <= dm){
             ++fca_bundle.conflicts;
 
             FCADetect det;
@@ -207,8 +226,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
 // Identify the risker obstacle using the critical time of avoidance and generate teh avoidance waypoints:
     void avoidance_waypoints(const FCABundle &overall_obstacles, double own_e, double own_n, double own_u,
-        double own_ve, double own_vn, double own_vu, double own_course, double own_fpa,
-        const std::vector<Eigen::Vector3d> &future_target_pos,double min_radius, double crit_time, NavigationState& nav_state){
+        double own_ve, double own_vn, double own_vu, double own_course, double own_fpa,double min_radius, NavigationState& nav_state){
     // Ownship velocity and position information:
     const Eigen::Vector3d act_pos(own_e,own_n,own_u);
     const Eigen::Vector3d act_vel(own_ve,own_vn,own_vu);
@@ -230,14 +248,8 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         double rel_vel_norm = act_obstacles[i].rel_vel_enu.norm();
         double act_crit_time;
         // Caclulate the critical time of each target:
-        if (rel_vel_norm < 1e-3) {
-            // If they are flying parallel AND already inside the avoidance zone, trigger instantly
-            if (act_obstacles[i].rel_pos_enu.norm() < act_obstacles[i].dm) {
-                act_crit_time = 0.0; 
-            } else {
-                // Flying parallel but safely outside the zone
-                act_crit_time = 9999.0; 
-            }
+        if (act_obstacles[i].rel_pos_enu.norm() < act_obstacles[i].dm) {
+            act_crit_time = 0.0; 
         } else {
             // Normal calculation for converging trajectories
             act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-min_radius-act_obstacles[i].dm) / rel_vel_norm;
@@ -258,7 +270,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         return;
     }                   
     if (!std::isfinite(min_crit_time)||count_time==0) return;
-    if (min_crit_time > crit_time) return;
+    if (min_crit_time >= 0.2) return;
 
     // Start the avoidance in case it is lower than the critical time:
     double speed = act_vel.norm();
@@ -274,8 +286,10 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
     // Modify the waypoints:
     // Identify the actual avoidance obstacle characteristics:
-    Eigen::Vector3d avoidance_center = act_obstacles[crit_target_idx].rel_pos_enu + act_pos;
-    Eigen::Vector3d crit_next_pos = future_target_pos[crit_target_idx];
+    Eigen::Vector3d int_vel = act_vel - act_obstacles[crit_target_idx].rel_vel_enu;
+    double forward_time = 0.1; 
+    Eigen::Vector3d avoidance_center = (act_obstacles[crit_target_idx].rel_pos_enu + act_pos) + (int_vel * forward_time);
+    Eigen::Vector3d crit_next_pos = (avoidance_center) + (int_vel * forward_time);;
     double dm_avoid = act_obstacles[crit_target_idx].dm;
     // Use the ownship inforamtion to generate the avoiance zone:
     const double own_yaw = M_PI / 2 - own_course;
@@ -283,7 +297,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
 
     // Generate the avoidance zone:
     // Deine the normal avoidance circle normal to the velcoity of the ownship:
-    int N = 50;
+    int N = 54;
     // Rotation matrices:
     Eigen::Matrix3d Rz, Ry;
     Rz << std::cos(own_yaw), -std::sin(own_yaw), 0,
@@ -339,27 +353,27 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         double d_north = circle[i].y() - act_pos.y();
         double d_east = circle[i].x() - act_pos.x();
         double horiz = std::max(std::sqrt(d_north*d_north + d_east*d_east), 1e-6);
-        double d_pitch = std::atan2(d_alt, horiz);
+        double d_pitch = std::atan2(d_alt, horiz) - own_pitch;
         double d_yaw   = std::atan2(d_east, std::max(d_north, 1e-9));
         double d_yaw_diff = d_yaw - own_course;
         while (d_yaw_diff > M_PI) d_yaw_diff -= 2.0 * M_PI;
         while (d_yaw_diff < -M_PI) d_yaw_diff += 2.0 * M_PI;
 
         // Get a ratio that depends on the next posiiton orientation respct to teh pincipal avoidance circle position:
-        if (circle[i].z() < 0) {
+        if (circle[i].z() < 600.0) {
             continue;
         }
         Eigen::Vector3d r_avo_fut = crit_next_pos - avoidance_center;
         Eigen::Vector3d r_avo_circ = circle[i]  - avoidance_center;
-        double value_1 = std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
+        double value_1 = 0.5*std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
         
 
         double cost;
-        if ((d_pitch - own_pitch) < 0.0) {
-            cost = ((1.0/(value_1+0.1)) + 10.0) * std::abs(d_pitch)
+        if ((d_pitch) < 0.0) {
+            cost = ((1.0/(value_1+0.1)) + 20) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         } else {
-            cost = ((1.0/(value_1+0.1)) + 1.2) * std::abs(d_pitch)
+            cost = ((1.0/(value_1+0.1)) + 5) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         }
 
@@ -388,14 +402,15 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     P.col(1) = own_vel_norm;
     P.col(2) = principal_avoidance_point_enu_new;
     // Anilize if the rotation needs to go from +/- 90 deg using the closests avoidance point:
-    const Eigen::Vector3d cand_p  = avoidance_center + dm_avoid * (P * Rx_deg( +90.0) * P.transpose() * principal_avoidance_point_enu_new);
-    const Eigen::Vector3d cand_m  = avoidance_center + dm_avoid * (P * Rx_deg( -90.0) * P.transpose() * principal_avoidance_point_enu_new);
-    const double d1 = (nav_state.avoidance_last_point_enu.value() - cand_p).squaredNorm();
-    const double d2 = (nav_state.avoidance_last_point_enu.value() - cand_m).squaredNorm();
-    // Generate the avodiance trajectory using the proper direction:
-    std::array<double,7> phi = (d1<d2)
-        ? std::array<double,7>{-60.0,-30.0,-15.0,0.0,15.0,30.0,60.0}
-        : std::array<double,7>{60.0,30.0,15.0,0.0,-15.0,-30.0,-60.0};
+    const Eigen::Vector3d start_cand_1 = avoidance_center + dm_avoid * (P * Rx_deg(-60.0) * P.transpose() * principal_avoidance_point_enu_new);
+    const Eigen::Vector3d start_cand_2 = avoidance_center + dm_avoid * (P * Rx_deg(60.0) * P.transpose() * principal_avoidance_point_enu_new);
+    // Check which starting point is closest to the drone's actual current position:
+    const double dist1 = (act_pos - start_cand_1).squaredNorm();
+    const double dist2 = (act_pos - start_cand_2).squaredNorm();
+    // Generate the avoidance trajectory starting from the closest point:
+    std::array<double,7> phi = (dist1 < dist2)
+        ? std::array<double,7>{-60.0, -30.0, -15.0, 0.0, 15.0, 30.0, 60.0}
+        : std::array<double,7>{60.0, 30.0, 15.0, 0.0, -15.0, -30.0, -60.0};
     // Vector to save the avoidance waypoint path:
     std::vector<Eigen::Vector3d> avoidance_waypoints; avoidance_waypoints.reserve(7);
     for (double angle : phi)
@@ -514,7 +529,7 @@ void computeGeometricAvoidance(const uav_dynamics::msg::AvoidanceStates& obstacl
 
             // Calculate their critical avoidance time to generate the avoiance waypoints:
             avoidance_waypoints(overall_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, own_course, own_fpa, 
-                Target_Next_pos, min_radius, crit_time, nav_state);
+                min_radius, nav_state);
         } else {
             // Analyze if at any time the avoider enters inside the obstacles:
             nav_state.inside_avoidance = Detect_intrusion(obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu);

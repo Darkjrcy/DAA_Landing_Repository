@@ -60,7 +60,7 @@ class FixedWingDynamics : public rclcpp::Node{
                 if (active_avoidance_ && guidance_system_ == "GEOMETRIC") {
                     avoidance_vars_geom_ = GeometricAvoidanceVars{
                         180, // min_radius of turn (m)
-                        0.2 // critical avoidance time (s)
+                        0.0000 // critical avoidance time (s)
                     };
 
                     RCLCPP_INFO(this->get_logger(), "Geometric avoidance system created.");
@@ -448,7 +448,7 @@ class FixedWingDynamics : public rclcpp::Node{
             const double kp_V = 0.3; // proportional gain of the velocity
             const double kp_roll = 2.5; //proportional gain of the roll
             const double kd_roll = 0.8; //derivatice gain of the roll
-            const double kp_Y = 0.25; // proportional gain of the course
+            const double kp_Y = 1.0; // proportional gain of the course
             const double kp_h = 0.4; // proportional gain of the velocity
             const double kp_heading = 0.8; // proportional gain of the heading
             
@@ -470,7 +470,8 @@ class FixedWingDynamics : public rclcpp::Node{
             // Obtian the FPA command:
             double alt_diff = kp_h * (alt_cmd - state(2));
             alt_diff = std::clamp(alt_diff, -V, V);
-            double Y_cmd = asin((1.0 / V) * alt_diff);
+            double max_fpa = 15.0 * M_PI / 180.0;
+            double Y_cmd = std::clamp(std::asin((1.0 / V) * alt_diff), -max_fpa, max_fpa);
 
             // Genate the derivative vector:
             dstate(0) = V * cos(state(3)) * cos(state(4));
@@ -617,7 +618,7 @@ class FixedWingDynamics : public rclcpp::Node{
                     // For intruders continue flying:
                     goal_reached_ = false;
                     // Define cruise conditions:
-                    double cruise_speed = std::max(cmd_vel_.back() * 0.5, 10.0);
+                    double cruise_speed = cmd_vel_.back();
                     double course_cmd_cruise = actual_state(3); 
                     double alt_cmd_cruise = actual_state(2);
                     Eigen::VectorXd cruise_dstates = FixedWingLogic(actual_state, cruise_speed, course_cmd_cruise, alt_cmd_cruise);

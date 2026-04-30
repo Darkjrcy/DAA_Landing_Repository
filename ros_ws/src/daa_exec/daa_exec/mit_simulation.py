@@ -176,7 +176,7 @@ class MITSimulation(Node):
         self.is_a_vtol = False
 
         # Define vectors to save the avoiders and the intruders:
-        self.intial_encounter = 13
+        self.intial_encounter = 59
         # Inital angle of avoiders:
         self.init_roll = {}
         self.init_pitch = {}
