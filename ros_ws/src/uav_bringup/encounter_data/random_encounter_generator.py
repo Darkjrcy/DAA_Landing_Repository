@@ -164,12 +164,12 @@ for uav in num_uavs:
             # Take out the mean values:
             in_traj_array[:, 0] -= avg_N
             in_traj_array[:, 1] -= avg_E
-            in_traj_array[:, 2] -= 300
+            in_traj_array[:, 2] -= 1000
             in_traj_array[:, 3] = in_traj_array[:, 3] * 0.8
             
             own_traj_array[:, 0] -= avg_N
             own_traj_array[:, 1] -= avg_E
-            own_traj_array[:, 2] -= 300
+            own_traj_array[:, 2] -= 1000
             own_traj_array[:, 3] = own_traj_array[:, 3] * 0.8
             # Format awways into the requested strings:
             trajectories_lists[f"uav_{uav_idx+1}"].append(format_trajectory(own_traj_array))

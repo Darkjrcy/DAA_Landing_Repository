@@ -243,17 +243,23 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     // Iidentify the critical target
     int crit_target_idx = 0;
 
+    // Define the delay time:
+    double dt = 0.05;
+
     for (size_t i = 0; i < n ; ++i){
         // Get the relative velocity:
         double rel_vel_norm = act_obstacles[i].rel_vel_enu.norm();
         double act_crit_time;
+        // Define the intruder velocity:
+        double int_vel_i = (act_vel - act_obstacles[i].rel_vel_enu).norm();
         // Caclulate the critical time of each target:
-        if (act_obstacles[i].rel_pos_enu.norm() < act_obstacles[i].dm) {
+        if ((act_obstacles[i].rel_pos_enu.norm() - 2.0 * min_radius)< act_obstacles[i].dm){ 
             act_crit_time = 0.0; 
-        } else {
+        }else {
             // Normal calculation for converging trajectories
-            act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-min_radius-act_obstacles[i].dm) / rel_vel_norm;
+            act_crit_time = (act_obstacles[i].rel_pos_enu.norm()*(std::cos(act_obstacles[i].theta_to)+std::sin(act_obstacles[i].theta_to))-2.0*min_radius-act_obstacles[i].dm) / rel_vel_norm;
         }
+        
         // check if one of the airplanes that was already avoided is giving problems by staying in a negative avoidance zone:
         if (act_crit_time < -0.01){continue;}
         if (count_time == 0 || act_crit_time < min_crit_time){
@@ -270,7 +276,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         return;
     }                   
     if (!std::isfinite(min_crit_time)||count_time==0) return;
-    if (min_crit_time >= 0.2) return;
+    if (min_crit_time >= dt) return;
 
     // Start the avoidance in case it is lower than the critical time:
     double speed = act_vel.norm();
@@ -285,9 +291,8 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     // Modify the waypoints:
     // Identify the actual avoidance obstacle characteristics:
     Eigen::Vector3d int_vel = act_vel - act_obstacles[crit_target_idx].rel_vel_enu;
-    double forward_time = 0.5; 
-    Eigen::Vector3d avoidance_center = (act_obstacles[crit_target_idx].rel_pos_enu + act_pos) + (int_vel * forward_time);
-    Eigen::Vector3d crit_next_pos = (avoidance_center) + (int_vel * forward_time);;
+    Eigen::Vector3d avoidance_center = (act_obstacles[crit_target_idx].rel_pos_enu + act_pos) + (int_vel * dt);
+    Eigen::Vector3d crit_next_pos = (avoidance_center) + (int_vel * dt);;
     double dm_avoid = act_obstacles[crit_target_idx].dm;
     // Use the ownship inforamtion to generate the avoiance zone:
     const double own_yaw = M_PI / 2 - own_course;
@@ -347,6 +352,12 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     size_t best_avoid_idx = 0;
     for (int i = 0; i < N; ++i)
     {
+        // Get a ratio that depends on the next posiiton orientation respct to teh pincipal avoidance circle position:
+        if (circle[i].z() < 500.0) {
+            continue;
+        }
+
+        // Get the cost"
         double d_alt = circle[i].z() - act_pos.z();
         double d_north = circle[i].y() - act_pos.y();
         double d_east = circle[i].x() - act_pos.x();
@@ -357,21 +368,18 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         while (d_yaw_diff > M_PI) d_yaw_diff -= 2.0 * M_PI;
         while (d_yaw_diff < -M_PI) d_yaw_diff += 2.0 * M_PI;
 
-        // Get a ratio that depends on the next posiiton orientation respct to teh pincipal avoidance circle position:
-        if (circle[i].z() < 600.0) {
-            continue;
-        }
+        
         Eigen::Vector3d r_avo_fut = crit_next_pos - avoidance_center;
         Eigen::Vector3d r_avo_circ = circle[i]  - avoidance_center;
         double value_1 = 2 * std::abs(std::acos(r_avo_fut.dot(r_avo_circ)/(r_avo_fut.norm()*r_avo_circ.norm())));
         
 
         double cost;
-        if ((d_pitch) < 0.0 || d_alt !=0) {
+        if ((d_pitch) < 0.0) {
             cost = ((1.0/(value_1+0.1)) + 200) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         } else {
-            cost = ((1.0/(value_1+0.1)) + 100) * std::abs(d_pitch)
+            cost = ((1.0/(value_1+0.1)) + 50) * std::abs(d_pitch)
                 + (1.0/(value_1+0.1)) * std::abs(d_yaw_diff);
         }
 
@@ -414,21 +422,21 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
         ? std::array<double,11>{-80.0, -70.0, -60.0, -30.0, -15.0, 0.0, 15.0, 30.0, 60.0, 70.0, 80.0}
         : std::array<double,11>{80.0, 70.0, 60.0, 30.0, 15.0, 0.0, -15.0, -30.0, -60.0, -70.0, -80.0}; 
     // Generate the avoidance waypoint path
-    std::vector<Eigen::Vector3d> avoidance_waypoints; 
-    avoidance_waypoints.reserve(11);
+    std::vector<Eigen::Vector3d> avoidance_path; 
+    avoidance_path.reserve(11);
     for (double angle : phi)
     {
         Eigen::Vector3d avoid_point = avoidance_center + safe_dm_avoid * (Eigen::AngleAxisd(angle * M_PI / 180.0, axis) * principal_avoidance_point_enu_new);
-        avoidance_waypoints.push_back(ENU_to_NED(avoid_point));
+        avoidance_path.push_back(ENU_to_NED(avoid_point));
     }
 
 
     // Insert the 11 waypoints in the waypoint list:
-    nav_state.waypoints.insert(nav_state.waypoints.begin() + static_cast<long>(insert_at_wp), avoidance_waypoints.begin(), avoidance_waypoints.end());
+    nav_state.waypoints.insert(nav_state.waypoints.begin() + static_cast<long>(insert_at_wp), avoidance_path.begin(), avoidance_path.end());
     // Add velocities as the akst velocity multiplied:
     const double keep_speed = (insert_at_wp < nav_state.cmd_vel.size()) ? nav_state.cmd_vel[insert_at_wp] : 0.0;
     nav_state.cmd_vel.insert(nav_state.cmd_vel.begin() + static_cast<long>(insert_at_wp), 11, keep_speed);
-    const size_t arc_len = avoidance_waypoints.size(); // 11
+    const size_t arc_len = avoidance_path.size(); // 11
     nav_state.end_of_arc = insert_at_wp + arc_len - 1;
     // eliminate the middle waypoints in the avoidance path;
     size_t rejoin_idx_new = near_wp_idx;
