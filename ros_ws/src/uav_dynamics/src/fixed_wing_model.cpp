@@ -235,11 +235,11 @@ class FixedWingDynamics : public rclcpp::Node{
             // Define the constant values
             const double g = 9.81;   // gravity
             const double kp_V = 0.6; // proportional gain of the velocity
-            const double kp_roll = 0.6; //proportional gain of the roll
-            const double kd_roll = 1.8; //derivatice gain of the roll
+            const double kp_roll = 0.7; //proportional gain of the roll
+            const double kd_roll = 0.3; //derivatice gain of the roll
             const double kp_Y = 0.5; // proportional gain of the course
             const double kp_h = 0.4; // proportional gain of the velocity
-            const double kp_heading = 0.4; // proportional gain of the heading
+            const double kp_heading = 0.05; // proportional gain of the heading
             
             // Start teh derivative vector:
             Eigen::VectorXd dstate(8);
@@ -269,7 +269,7 @@ class FixedWingDynamics : public rclcpp::Node{
             dstate(4) = kp_Y * (Y_cmd - state(4));
             dstate(5) = kp_V * (vel_cmd - V);
             dstate(7) = kp_roll * (roll_cmd - state(6)) - kd_roll * state(7);
-            dstate(6) = 0.1 * dstate(7) + state(7);\
+            dstate(6) = 0.2 * dstate(7) + state(7);
 
             // Establish some limits:
             dstate(4) = std::clamp(dstate(4), -3.0 * (M_PI / 180.0), 3.0 * (M_PI / 180.0));  // pitch rate
@@ -315,8 +315,8 @@ class FixedWingDynamics : public rclcpp::Node{
             // Calacualte the lookahed aditsnte and the transitionr adius:
             double current_speed = std::max(velocity_a, 1.0);
             double current_min_radius = 2.0 * (current_speed * current_speed) / (std::tan(max_roll_) * 9.81);
-            transition_radius_ = std::max(100.0, current_min_radius * 2.0); 
-            look_ahead_distance_ = std::max(20.0, current_speed * 3.0); 
+            transition_radius_ = std::max(70.0, current_min_radius * 1.0); 
+            look_ahead_distance_ = std::max(20.0, current_speed * 1.0); 
 
             // USe the Waypoint follower to obtain teh next waypoint to follow:
             NextGoalInformation next_goal = WaypointFollower(actual_pose, waypoints_, look_ahead_distance_, current_idx, transition_radius_);

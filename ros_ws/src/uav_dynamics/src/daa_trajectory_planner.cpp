@@ -484,6 +484,9 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                 publish_avoidance_path();
 
             } else if (guidance_system_ == "FMT" ) {
+                // ADD THIS: Advance the FMT clock!
+                tick_counter_++;
+
                 FMTNavigationState nav_state_fmt{
                     waypoints_,
                     cmd_vel_,
@@ -501,9 +504,6 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                     nav_state_fmt,
                     rt_fmt_planner_.value()
                 );
-
-                // ADD THIS: Advance the FMT clock!
-                tick_counter_++;
                 
                 // Publsih the waypoints:
                 if (tick_counter_ % 10) {

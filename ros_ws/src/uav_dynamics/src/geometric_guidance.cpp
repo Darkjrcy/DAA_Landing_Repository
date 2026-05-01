@@ -285,7 +285,7 @@ FCABundle Check_for_overalping(const FCABundle &active_obstacles, double own_e, 
     // Modify the waypoints:
     // Identify the actual avoidance obstacle characteristics:
     Eigen::Vector3d int_vel = act_vel - act_obstacles[crit_target_idx].rel_vel_enu;
-    double forward_time = 0.1; 
+    double forward_time = 0.5; 
     Eigen::Vector3d avoidance_center = (act_obstacles[crit_target_idx].rel_pos_enu + act_pos) + (int_vel * forward_time);
     Eigen::Vector3d crit_next_pos = (avoidance_center) + (int_vel * forward_time);;
     double dm_avoid = act_obstacles[crit_target_idx].dm;

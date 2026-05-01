@@ -119,7 +119,7 @@ def launch(context, *args, **kwargs):
     # Define which of the UAVs have aviodance:
     has_avoidance = [True, False]
     # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
-    type_avoidance = ["FMT", "NONE"]
+    type_avoidance = ["GEOMETRIC", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################
