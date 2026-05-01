@@ -21,6 +21,8 @@
 #include "uav_dynamics/msg/intruders_status.hpp"
 #include "uav_dynamics/msg/intruders_status.hpp"
 #include "uav_dynamics/msg/intruder_flag.hpp"
+#include "uav_dynamics/msg/waypoint.hpp"
+#include "uav_dynamics/msg/avoidance_path.hpp"
 // Add the library of the Fast geometric avoidance ssytem:
 #include "uav_dynamics/geometric_guidance.hpp"
 // Add the library of the RT-FMT guidance system:
@@ -114,6 +116,9 @@ class DAATrajectoryPlanner : public rclcpp::Node{
             current_idx_sub_ = this->create_subscription<std_msgs::msg::Int32>(
                 current_idx_topic, qos, std::bind(&DAATrajectoryPlanner::current_idx_callback, this, std::placeholders::_1));
 
+            // Pubvlsiher of the waypoitns:
+            waypoints_pub_ = this->create_publisher<uav_dynamics::msg::AvoidancePath>(waypoints_topic, qos);
+
             // If the avoidance analysis is necesary add publishers of when the avoidance occurs, and is the avoidance goes against any intruder:
             if (avoidance_analysis_){
                 // Topic for the publishers of when the avoidance occurs, and if inside an avodiacne region:
@@ -194,6 +199,7 @@ class DAATrajectoryPlanner : public rclcpp::Node{
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr current_idx_sub_;
         rclcpp::Publisher<uav_dynamics::msg::IntrudersStatus>::SharedPtr is_inside_avo_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr is_avoiding_pub_;
+        rclcpp::Publisher<uav_dynamics::msg::AvoidancePath>::SharedPtr waypoints_pub_; 
         // Define the avoidance last point: 
         std::optional<Eigen::Vector3d> avoidance_last_point_enu;
         
@@ -419,6 +425,34 @@ class DAATrajectoryPlanner : public rclcpp::Node{
 
 
 
+        // FUnction to publisht eh waypoitns:
+        void publish_avoidance_path() {
+            uav_dynamics::msg::AvoidancePath msg;
+            
+            // Safely grab the current index using the mutex
+            int local_idx;
+            {
+                std::lock_guard<std::mutex> lock(current_idx_mutex_);
+                local_idx = current_idx;
+            }
+            msg.current_idx = local_idx;
+
+            // Load all waypoints into the message
+            for (size_t i = 0; i < waypoints_.size(); ++i) {
+                uav_dynamics::msg::Waypoint wp;
+                wp.north = waypoints_[i].x();
+                wp.east = waypoints_[i].y();
+                wp.down = waypoints_[i].z();
+                wp.velocity = cmd_vel_[i];
+                msg.waypoints.push_back(wp);
+            }
+
+            // Publish the message!
+            waypoints_pub_->publish(msg);
+        }
+
+
+
         // Callback that is called when a Obstacle message is recieved:
         void obstacle_states_callback(const uav_dynamics::msg::AvoidanceStates::SharedPtr msg){
             // Always start it:
@@ -446,6 +480,9 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                     crit_time_, 
                     nav_state
                 );
+                // Publsih the waypoints:
+                publish_avoidance_path();
+
             } else if (guidance_system_ == "FMT" ) {
                 FMTNavigationState nav_state_fmt{
                     waypoints_,
@@ -464,6 +501,14 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                     nav_state_fmt,
                     rt_fmt_planner_.value()
                 );
+
+                // ADD THIS: Advance the FMT clock!
+                tick_counter_++;
+                
+                // Publsih the waypoints:
+                if (tick_counter_ % 10) {
+                    publish_avoidance_path();
+                }
             }
 
             // Publish the avoidance analysis if its required:
