@@ -441,7 +441,7 @@ class MITSimulation(Node):
             max_range_east = max_range_north
         self.ax.set_xlim(mid_x - max_range_east, mid_x + max_range_east)
         self.ax.set_ylim(mid_y - max_range_north, mid_y + max_range_north)
-        self.ax.set_zlim(mid_z - max_range_east, mid_z + max_range_east)
+        self.ax.set_zlim(0, mid_z + max_range_east)
         plt.show(block=False)
             
 
@@ -725,17 +725,23 @@ class MITSimulation(Node):
             # Remember if its a vtol it woudl run the dynamics in MATLAB, so you don't need to open them:
             if not self.is_a_vtol:
                 own_args = [
-                    "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], self.avoiders_type[name], "1", "1" 
+                    "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], "1"
                 ]
                 # Add it to the running process:
-                self.running_procs[name] = subprocess.Popen(own_args, start_new_session=True)
+                self.running_procs[f"{name}_dynamics"] = subprocess.Popen(own_args, start_new_session=True)
+
+                # Add the DAA trajectory derigner:
+                daa_args = [
+                    "ros2", "run", "uav_dynamics", "daa_trajectory_planner_node", name, seg_list[idx], self.avoiders_type[name], "1"
+                ]
+                self.running_procs[f"{name}_planner"] = subprocess.Popen(daa_args, start_new_session=True)
         # Now fo it for every intruder:
         for name, seg_list in self.intruders_info_string.items():
             intr_args = [
-                "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], "NONE", "0", "0" 
+                "ros2", "run", "uav_dynamics", f"{self.uav_type[name]}_dynamics_node", name, seg_list[idx], "0"
             ]
             # Add it to the running process:
-            self.running_procs[name] = subprocess.Popen(intr_args, start_new_session=True)
+            self.running_procs[f"{name}_dynamics"] = subprocess.Popen(intr_args, start_new_session=True)
     
     
 

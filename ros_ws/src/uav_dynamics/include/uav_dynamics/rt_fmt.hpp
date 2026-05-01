@@ -97,12 +97,13 @@ struct FMTNavigationState {
     std::vector<Eigen::Vector3d>& waypoints;
     std::vector<double>& cmd_vel;
     size_t& current_idx;
-    double& transition_radius;
-    double& look_ahead_distance;
 
     // Define the parameters to identify ifthe UAV is inside the avoidacen reagion and the starting condition:
     bool& start_the_avoidance;
     std::vector<std::pair<std::string, int>>& inside_avoidance;
+
+    // Tick counter:
+    int& tick_counter;
 };
 
 

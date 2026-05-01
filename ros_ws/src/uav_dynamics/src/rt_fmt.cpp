@@ -1520,10 +1520,10 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
     FMTBundle active_obs = FMT_Detect(moving_obstacles, own_e, own_n, own_u, own_ve, own_vn, own_vu, crit_time, min_radius);
 
     if (!nav_state.start_the_avoidance){
-        // If there nor conflict exit:
-        if (active_obs.conflicts == 0){
-            return;
-        }
+        // // If there nor conflict exit:
+        // if (active_obs.conflicts == 0){
+        //     return;
+        // }
 
         // If they are obstacles you strart the avoidance:
         nav_state.start_the_avoidance = true;
@@ -1543,38 +1543,42 @@ void computerFMTAvoidance(const uav_dynamics::msg::AvoidanceStates& moving_obsta
     std::chrono::duration<double, std::milli> elapsed = end_time - start_time;
     std::cout << "[RT-FMT] Tick (" << rt_fmt_planner.ft_fmt_mask.expandTreeRate << " steps) took: " 
               << elapsed.count() << " ms" << std::endl;
+    
+    nav_state.tick_counter += 1;
 
-    // Get the path enhance it in the waypoints:
-    PathResult current_path = generatePath(current_state);
-    if (current_path.path_found && !current_path.waypoints.empty()){
-        std::vector<Eigen::Vector3d> updated_waypoints;
-        std::vector<double> updated_cmd_vel;
+    if (nav_state.tick_counter % 10) {
+        // Get the path enhance it in the waypoints:
+        PathResult current_path = generatePath(current_state);
+        if (current_path.path_found && !current_path.waypoints.empty()){
+            std::vector<Eigen::Vector3d> updated_waypoints;
+            std::vector<double> updated_cmd_vel;
 
-        // Preserve all the past waypoints before the current idx:
-        for (size_t i = 0; i < nav_state.current_idx; i++){
-            updated_waypoints.push_back(nav_state.waypoints[i].head(3));
-            updated_cmd_vel.push_back(nav_state.cmd_vel[i]);
+            // Preserve all the past waypoints before the current idx:
+            for (size_t i = 0; i < nav_state.current_idx; i++){
+                updated_waypoints.push_back(nav_state.waypoints[i].head(3));
+                updated_cmd_vel.push_back(nav_state.cmd_vel[i]);
+            }
+
+            // Append the path created by the FMT:
+            for (size_t i = 1; i < current_path.waypoints.size(); i++){
+                updated_waypoints.push_back(current_path.waypoints[i].head(3));
+                updated_cmd_vel.push_back(own_vel_a);
+            }
+
+            // Ensure the las point is the goal:
+            Eigen::Vector3d ultimate_goal = nav_state.waypoints.back();
+            double ultimate_vel = nav_state.cmd_vel.back();
+
+            // Check if the FMT already accounts for the ultimate goal:
+            double dist_to_ultimate = (updated_waypoints.back().head(3) - ultimate_goal.head(3)).norm();
+            if (dist_to_ultimate > 1.0) { 
+                updated_waypoints.push_back(ultimate_goal);
+                updated_cmd_vel.push_back(ultimate_vel);
+            }
+
+            // Save it in te navigation state:
+            nav_state.waypoints = updated_waypoints;
+            nav_state.cmd_vel = updated_cmd_vel;
         }
-
-        // Append the path created by the FMT:
-        for (size_t i = 1; i < current_path.waypoints.size(); i++){
-            updated_waypoints.push_back(current_path.waypoints[i].head(3));
-            updated_cmd_vel.push_back(own_vel_a);
-        }
-
-        // Ensure the las point is the goal:
-        Eigen::Vector3d ultimate_goal = nav_state.waypoints.back();
-        double ultimate_vel = nav_state.cmd_vel.back();
-
-        // Check if the FMT already accounts for the ultimate goal:
-        double dist_to_ultimate = (updated_waypoints.back().head(3) - ultimate_goal.head(3)).norm();
-        if (dist_to_ultimate > 1.0) { 
-            updated_waypoints.push_back(ultimate_goal);
-            updated_cmd_vel.push_back(ultimate_vel);
-        }
-
-        // Save it in te navigation state:
-        nav_state.waypoints = updated_waypoints;
-        nav_state.cmd_vel = updated_cmd_vel;
     }
 }

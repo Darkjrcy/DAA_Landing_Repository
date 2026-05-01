@@ -16,8 +16,6 @@ struct NavigationState {
     std::vector<Eigen::Vector3d>& waypoints;
     std::vector<double>& cmd_vel;
     size_t& current_idx;
-    double& transition_radius;
-    double& look_ahead_distance;
     bool& start_the_avoidance;
     std::optional<Eigen::Vector3d>& avoidance_last_point_enu;
     std::optional<size_t>& end_of_arc;
