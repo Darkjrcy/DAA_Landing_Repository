@@ -74,7 +74,7 @@ def launch(context, *args, **kwargs):
     robot_scale = ["0.7", "0.7"]
     camera_num = ["1.0", "0.0"]
     # Launch arguments for the world:
-    world = "MIT.sdf"
+    world = "empty_world.sdf"
     world_name = get_world_name(world)
     # Fog characteristis:
     fog_lifetime="10.0"
@@ -119,7 +119,7 @@ def launch(context, *args, **kwargs):
     # Define which of the UAVs have aviodance:
     has_avoidance = [True, False]
     # The type of guidance DAA algorithm it uses ("GEOMETRIC", "FMT" ...) if doesn';t use put "NONE":
-    type_avoidance = ["GEOMETRIC", "NONE"]
+    type_avoidance = ["FMT", "NONE"]
 
 
     ############# Important change the location where the AIrplane data is going to be saved#########################

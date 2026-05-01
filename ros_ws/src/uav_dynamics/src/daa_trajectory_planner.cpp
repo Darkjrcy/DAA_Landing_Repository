@@ -262,7 +262,11 @@ class DAATrajectoryPlanner : public rclcpp::Node{
             auto d_lim = std::minmax_element(Waypoints.begin(), Waypoints.end(),
                 [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.z() < b.z(); });
 
-            limits_way = {{n_lim.first->x()-400, n_lim.second->x()+400}, {e_lim.first->y()-400, e_lim.second->y()+400}, {d_lim.first->z()-20, d_lim.second->z()+20}};
+            limits_way = {
+                {n_lim.first->x() - 400.0, n_lim.second->x() + 400.0}, 
+                {e_lim.first->y() - 400.0, e_lim.second->y() + 400.0}, 
+                {d_lim.first->z() - 300.0, std::min(-100.0, d_lim.second->z() + 300.0)} 
+            };
 
             return limits_way;
         }
