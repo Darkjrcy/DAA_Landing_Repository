@@ -57,6 +57,8 @@ struct  RTFMTPLannerState{
     std::vector<double> cost; // Cost of the nodes
     std::vector<int> state; // 0=Undefined, 1=Open, 2=Unvisited, 3=Closed
     std::vector<int> unvis;     // Unvisited set indices
+    std::vector<bool> isUnvis;
+    std::vector<bool> isGoalRegion;
     std::vector<bool> isOpen; // NOdes that are open
     int z; // Current Node
 
@@ -64,8 +66,14 @@ struct  RTFMTPLannerState{
     std::vector<bool> blocked;
     std::vector<bool> openNew;
     std::vector<bool> closedToOpen;
-    std::vector<bool> checkedPath;
+    std::vector<bool> checkedPath; 
     std::vector<int> checkedPathCandidates;
+
+    // Vector to save the localgoals as a integrer:
+    std::vector<int> localGoalsidx;
+    int current_local_goal_idx;
+    // DEfine the local velcoities of the lcaolgoals:
+    std::vector<double> local_goal_cmd_vel;
 
     // Dynamic Obstacle Masks
     std::vector<bool> dynamicObstructed;
@@ -74,6 +82,7 @@ struct  RTFMTPLannerState{
     std::deque<int> rewireLocalList;
     // Varibale to save the location fo teh waypoints index:
     std::vector<int> waypoint_location;
+    std::vector<bool> isWaypoint;
 
     // Tree characteristics and Neighbours;
     int lastRootIdx = -1;
@@ -128,6 +137,9 @@ struct FMTDetect {
     Eigen::Vector3d obs_pos; 
     // Minum avoidance radius:
     double dm;
+    
+    // Needs to avoid:
+    bool avoidance_required;
 };
 
 
@@ -156,7 +168,7 @@ struct PathResult {
 // Function to start the rt_ftm planner and create the mask witht he dubins path:
 void start_rt_fmt( const std::vector<int>& map, const std::vector<std::vector<double>>& limits, const std::vector<double>& start, 
     const std::vector<double>& goal, double rn, FMTPlanner& rt_fmt_planner, double max_roll, double air_speed, double fpa_limits[2],
-    const std::vector<Eigen::Vector3d>& waypoints = {});
+    const std::vector<Eigen::Vector3d>& waypoints = {}, const std::vector<double>& cmd_vel = {});
 
 // FUnction that executes one iteration of the RT-FMT:
 RTFMTPLannerState tick(FMTPlanner& rt_fmt_planner, FMTBundle& act_obs, const Eigen::VectorXd& currPose);

@@ -347,10 +347,10 @@ class FixedWingDynamics : public rclcpp::Node{
             act_mod_pose(2) = -act_mod_pose(2); 
 
             // Do stop system to stop if is near teh last waypoint:
-            if ((act_mod_pose - last_waypoint_).norm() <= 300){
+            if ((act_mod_pose - last_waypoint_).norm() <= 600){
 
                 // If teh avoider is near the goal make it stop:
-                if (active_avoidance_) {
+                if (active_avoidance_) { // CHanghe this back to normal if (active_avoidance_) when you finish the FMT system:
                     goal_reached_ = true;
                     // send a zero speed before starting a new trajectory
                     RCLCPP_INFO(this->get_logger(), "GOAL REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -372,20 +372,41 @@ class FixedWingDynamics : public rclcpp::Node{
                         last_published_goal_reached_ = goal_reached_;
                     }
                 } else {
-                    // For intruders continue flying:
-                    goal_reached_ = false;
-                    // Define cruise conditions:
-                    double cruise_speed = cmd_vel_.back();
-                    double course_cmd_cruise = actual_state(3); 
-                    double alt_cmd_cruise = actual_state(2);
-                    Eigen::VectorXd cruise_dstates = FixedWingLogic(actual_state, cruise_speed, course_cmd_cruise, alt_cmd_cruise);
+                    // // For intruders continue flying:
+                    // goal_reached_ = false;
+                    // // Define cruise conditions:
+                    // double cruise_speed = cmd_vel_.back();
+                    // double course_cmd_cruise = actual_state(3); 
+                    // double alt_cmd_cruise = actual_state(2);
+                    // Eigen::VectorXd cruise_dstates = FixedWingLogic(actual_state, cruise_speed, course_cmd_cruise, alt_cmd_cruise);
 
-                    cmd_velocity.linear.x = cruise_speed;
-                    cmd_velocity.angular.x = cruise_dstates(6);
-                    cmd_velocity.angular.y = -cruise_dstates(4);
-                    cmd_velocity.angular.z = -cruise_dstates(3);
+                    // cmd_velocity.linear.x = cruise_speed;
+                    // cmd_velocity.angular.x = cruise_dstates(6);
+                    // cmd_velocity.angular.y = -cruise_dstates(4);
+                    // cmd_velocity.angular.z = -cruise_dstates(3);
 
-                    cmd_vel_pub_->publish(cmd_velocity);
+                    // cmd_vel_pub_->publish(cmd_velocity);
+
+                    goal_reached_ = true;
+                    // send a zero speed before starting a new trajectory
+                    RCLCPP_INFO(this->get_logger(), "GOAL REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    cmd_velocity.linear.x = 0;
+                    cmd_velocity.angular.x = 0;
+                    cmd_velocity.angular.y = 0;
+                    cmd_velocity.angular.z = 0;
+                    // publish it:
+                    for (int i = 0; i < 3; ++i) {
+                        cmd_vel_pub_->publish(cmd_velocity);
+                        rclcpp::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    // Publish to the other UAVs that the encounter is completed:
+                    if (goal_reached_ != last_published_goal_reached_) {
+                        std_msgs::msg::Bool finish_follow;
+                        finish_follow.data = goal_reached_;
+                        complete_encounter_pub_->publish(finish_follow);
+                        last_published_goal_reached_ = goal_reached_;
+                    }
                 }
             } else {
                 goal_reached_ = false;

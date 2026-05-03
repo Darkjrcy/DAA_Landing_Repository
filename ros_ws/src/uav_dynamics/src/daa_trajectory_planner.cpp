@@ -71,12 +71,12 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                 // NUmber of nodes cacualted with a distance we wnat them to be separed average:
                 rt_fmt_planner_->rt_fmt_opts.N = 10000;
                 // Weights of the cost functio w1 (dist) and w2 (heading):
-                rt_fmt_planner_->rt_fmt_opts.w1 = 0.25;
-                rt_fmt_planner_->rt_fmt_opts.w2 = 50.0;
+                rt_fmt_planner_->rt_fmt_opts.w1 = 0.0;
+                rt_fmt_planner_->rt_fmt_opts.w2 = 0.0;
                 // Exapansion rate:
-                rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 100.0;
+                rt_fmt_planner_->rt_fmt_opts.expandTreeRate = 120.0;
                 // Gaol radius that it needs to be into:
-                rt_fmt_planner_->rt_fmt_opts.goal_radius = 50.0;
+                rt_fmt_planner_->rt_fmt_opts.goal_radius = 400.0;
                 // SAFE radius to be from the obstacle:
                 rt_fmt_planner_->rt_fmt_opts.safeRadiusDObstacle = 20;
 
@@ -90,10 +90,10 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                 mean_air_speed_ = get_mean(cmd_vel_);
                 // Searching radius:
                 double rn = mean_distance_nodes(limits_, rt_fmt_planner_->rt_fmt_opts.N);
-                rn = rn * 5.0;
+                rn = 300.0;
                 
                 // Generate the RT-FMT planner system:
-                start_rt_fmt(map, limits_, start_, goal_, rn, rt_fmt_planner_.value(), max_roll_, mean_air_speed_, fpa_limits_);
+                start_rt_fmt(map, limits_, start_, goal_, rn, rt_fmt_planner_.value(), max_roll_, mean_air_speed_, fpa_limits_, waypoints_,cmd_vel_);
                 
                 RCLCPP_INFO(this->get_logger(), "FMT avoidance system created.");
             }
@@ -173,7 +173,7 @@ class DAATrajectoryPlanner : public rclcpp::Node{
         double fpa_limits_[2] = {-0.3, 0.3};
         // Mean airspeed:
         double mean_air_speed_;
-
+ 
         // Define the actual states of the ownship:
         double current_speed_;
         double max_roll_ = 35.0/57.3;
@@ -263,9 +263,9 @@ class DAATrajectoryPlanner : public rclcpp::Node{
                 [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) { return a.z() < b.z(); });
 
             limits_way = {
-                {n_lim.first->x() - 400.0, n_lim.second->x() + 400.0}, 
-                {e_lim.first->y() - 400.0, e_lim.second->y() + 400.0}, 
-                {d_lim.first->z() - 300.0, std::min(-100.0, d_lim.second->z() + 300.0)} 
+                {n_lim.first->x() - 2000.0, n_lim.second->x() + 2000.0}, 
+                {e_lim.first->y() - 2000.0, e_lim.second->y() + 2000.0}, 
+                {d_lim.first->z() - 1000.0, std::min(-100.0, d_lim.second->z() + 300.0)} 
             };
 
             return limits_way;
